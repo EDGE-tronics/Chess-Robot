@@ -1,7 +1,12 @@
 import PySimpleGUI as sg
+import ChessLogic as cl
+import time
 import os
 import copy
+import threading
 import time
+
+
 '''
 styles:
 
@@ -11,37 +16,6 @@ LightGreen
 Black
 Dark
 '''
-
-conf = False
-
-def render_square(image, key, location):
-    if (location[0] + location[1]) % 2:
-        color =  '#B58863'
-    else:
-        color = '#F0D9B5'
-    return sg.Button('', image_filename=image, size=(1, 1),
-                          border_width=0, button_color=('white', color),
-                          pad=(0, 0), key=key)
-
-def newGameWindow (state):
-    if state == "OPEN":
-        menu_def2 = [['Properties'],      
-            ['Help', 'About...'], ]
-        board_controls2 = [[sg.RButton('New Game', key='New Game')],
-                    [sg.CBox('Play As White', key='_white_')],
-                    ]
-
-        layoutNewGame= [[sg.Menu(menu_def2, tearoff=False)], 
-            [sg.Column(board_controls2)]]
-        windowNewGame = sg.Window('Chess', default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(layoutNewGame)
-        b,v = windowNewGame.Read()
-        conf =  True  
-        return b,v  
-    elif state == "CLOSE":
-        windowNewGame.close()
-        conf = False
-
-
 CHESS_PATH = 'pieces_images'  # path to the chess pieces
 
 BLANK = 0  # piece names
@@ -67,6 +41,8 @@ initial_board = [[ROOKB, KNIGHTB, BISHOPB, QUEENB, KINGB, BISHOPB, KNIGHTB, ROOK
                  [PAWNW, ] * 8,
                  [ROOKW, KNIGHTW, BISHOPW, QUEENW, KINGW, BISHOPW, KNIGHTW, ROOKW]]
 
+psg_board = copy.deepcopy(initial_board)
+
 blank = os.path.join(CHESS_PATH, 'blank.png')
 bishopB = os.path.join(CHESS_PATH, 'nbishopb.png')
 bishopW = os.path.join(CHESS_PATH, 'nbishopw.png')
@@ -84,51 +60,272 @@ kingW = os.path.join(CHESS_PATH, 'nkingw.png')
 images = {BISHOPB: bishopB, BISHOPW: bishopW, PAWNB: pawnB, PAWNW: pawnW, KNIGHTB: knightB, KNIGHTW: knightW,
           ROOKB: rookB, ROOKW: rookW, KINGB: kingB, KINGW: kingW, QUEENB: queenB, QUEENW: queenW, BLANK: blank}
 
-# ------ Menu Definition ------ #      
-menu_def = [['Properties'],      
-            ['Help', 'About...'], ]  
+
+graveyard = 'k0'
+userColor = True
+playing =  False
+blackSquareColor = '#B58863'
+whiteSquareColor = '#F0D9B5'
+Debug = False
 
 
-# ------ Layout ------ # 
-# sg.SetOptions(margins=(0,0))
-sg.ChangeLookAndFeel('Dark')
-# create initial board setup
-board = copy.deepcopy(initial_board)
-# the main board display layout
-board_layout = [[sg.T(' '*6)] + [sg.T('{}'.format(a), pad=((23,27),0), font='Any 13') for a in 'abcdefgh']]
-# loop though board and create buttons with images
-for i in range(8):
-    row = [sg.T(str(8-i)+'   ', font='Any 13')]
-    for j in range(8):
-        piece_image = images[board[i][j]]
-        row.append(render_square(piece_image, key=(i,j), location=(i,j)))
-    row.append(sg.T(str(8-i)+'   ', font='Any 13'))
-    board_layout.append(row)
-# add the labels across bottom of board
-board_layout.append([sg.T(' '*6)] + [sg.T('{}'.format(a), pad=((23,27),0), font='Any 13') for a in 'abcdefgh'])
+def timer():
+   now = time.localtime(time.time())
+   print (now.tm_hour)
+   print (now.tm_min)
+   print (now.tm_sec)
+   return now
 
-board_controls = [[sg.RButton('New Game', key='newGame')]]
+def render_square(image, key, location):
+    if (location[0] + location[1]) % 2:
+        color =  blackSquareColor
+    else:
+        color = whiteSquareColor
+    return sg.Button('', image_filename=image, size=(1, 1),
+                          border_width=0, button_color=('white', color),
+                          pad=(0, 0), key=key)
 
-layout = [[sg.Menu(menu_def, tearoff=False)], 
-            [sg.Column(board_layout),sg.VerticalSeparator(pad=None),sg.Column(board_controls)]]
+def redrawBoard():
+    columns = 'abcdefgh'
+    global userColor
+    if userColor:
+        for i in range(8):
+            window.FindElement(key = str(8-i)+"r").Update("   "+str(8-i))
+            window.FindElement(key = str(8-i)+"l").Update(str(8-i)+"   ")
+            for j in range(8):
+                window.FindElement(key = columns[j]+"t").Update(columns[j])
+                window.FindElement(key = columns[j]+"b").Update(columns[j])    
+                color = blackSquareColor if (i + j) % 2 else whiteSquareColor
+                piece_image = images[initial_board[i][j]]
+                elem = window.FindElement(key=(i, j))
+                elem.Update(button_color=('white', color),
+                            image_filename=piece_image, )
+    else:
+        for i in range(8):
+            window.FindElement(key = str(8-i)+"r").Update("   "+str(i+1))
+            window.FindElement(key = str(8-i)+"l").Update(str(i+1)+"   ")
+            for j in range(8):
+                window.FindElement(key = columns[j]+"t").Update(columns[7-j])
+                window.FindElement(key = columns[j]+"b").Update(columns[7-j]) 
+                color = blackSquareColor if (i + j) % 2 else whiteSquareColor
+                piece_image = images[initial_board[7-i][7-j]]
+                elem = window.FindElement(key=(i, j))
+                elem.Update(button_color=('white', color),
+                            image_filename=piece_image, )
+
+def updateBoard(window, move):
+    global userColor
+    for cont in range(0,len(move["seq"]),4):
+        squareCleared = move["seq"][cont:cont+2]
+        squareOcuped = move["seq"][cont+2:cont+4]
+        y = cl.chess.square_file(cl.chess.SQUARE_NAMES.index(squareCleared))
+        x = 7 - cl.chess.square_rank(cl.chess.SQUARE_NAMES.index(squareCleared))
+
+        piece_image = images[psg_board[x][y]] 
+        piece = psg_board[x][y]
+        psg_board[x][y] = BLANK
+        color = blackSquareColor if (x + y) % 2 else whiteSquareColor
+        if userColor:
+            elem = window.FindElement(key=(x, y))
+        else:
+            elem = window.FindElement(key=(7-x, 7-y))
+        elem.Update(button_color=('white', color),
+                    image_filename=blank, )  
+
+        if squareOcuped != graveyard:
+            y = cl.chess.square_file(cl.chess.SQUARE_NAMES.index(squareOcuped))
+            x = 7 - cl.chess.square_rank(cl.chess.SQUARE_NAMES.index(squareOcuped))
+            psg_board[x][y] = piece
+            color = blackSquareColor if (x + y) % 2 else whiteSquareColor
+            if userColor:
+                elem = window.FindElement(key=(x, y))
+            else:
+                elem = window.FindElement(key=(7-x, 7-y))    
+            elem.Update(button_color=('white', color),
+                        image_filename=piece_image, )         
+
+def newGameWindow ():
+    global userColor
+    global playing
+    windowName = "Configuration"
+    initGame = [[sg.CBox('Play As White', key='userWhite', default = userColor)], [sg.Submit("Save")]]
+    if not playing:
+        while True:
+            windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(initGame)
+            button,value = windowNewGame.Read()
+            if button == "Save":
+                playing = True
+                print("Elegiste blancas:", value["userWhite"])
+                userColor = value["userWhite"]
+                break
+            if button in (None, 'Exit'): #MAIN WINDOW
+                break   
+    windowNewGame.close() 
+
+def quitGameWindow ():
+    global userColor
+    global playing
+    windowName = "Configuration"
+    quitGame = [[sg.Text('Are you sure?',justification='center', size=(30, 1), font='Any 13')], [sg.Submit("Yes",  size=(15, 1)),sg.Submit("No", size=(15, 1))]]
+    if playing:
+        while True:
+            windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(quitGame)
+            button,value = windowNewGame.Read()
+            if button == "Yes":
+                playing = False
+                break
+            if button in (None, 'Exit', "No"): #MAIN WINDOW
+                break   
+    windowNewGame.close()     
+
+def mainBoardLayout():
+    # ------ Menu Definition ------ #      
+    menu_def = [['Properties'],      
+                ['Help', 'About...'], ]  
 
 
+    # ------ Layout ------ # 
+    # sg.SetOptions(margins=(0,0))
+    sg.ChangeLookAndFeel('Dark')
+    # create initial board setup
+    board = copy.deepcopy(initial_board)
+    # the main board display layout
+    board_layout = [[sg.T(' '*12)] + [sg.T('{}'.format(a), pad=((0,47),0), font='Any 13', key = a+'t') for a in 'abcdefgh']]
+    # loop though board and create buttons with images
+    for i in range(8):
+        numberRow = 8-i 
+        row = [sg.T(str(numberRow)+'   ', font='Any 13', key = str(numberRow)+"l")]
+        for j in range(8):
+            piece_image = images[board[i][j]]
+            row.append(render_square(piece_image, key=(i,j), location=(i,j)))
+        row.append(sg.T('   '+str(numberRow), font='Any 13', key = str(numberRow)+"r"))
+        board_layout.append(row)
+    # add the labels across bottom of board
+    board_layout.append([sg.T(' '*12)] + [sg.T('{}'.format(a), pad=((0,47),0), font='Any 13', key = a+'b') for a in 'abcdefgh'])
 
-window = sg.Window('Chess', default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(layout)
+    board_controls = [[sg.RButton('New Game', key='newGame', size=(13, 2), font=('courier', 16))],
+                        [sg.RButton('Quit', key='quit', size=(6, 2), font=('courier', 16), disabled = True),sg.RButton('Draw', key='draw', size=(6, 2), font=('courier', 16), disabled = True)],
+                        [sg.InputText('' , size=(12, 1))],
+                        [sg.InputText('' , size=(12, 1))],
+                        [sg.InputText('' , size=(12, 1))],
+                        [sg.InputText('' , size=(12, 1))],
+                        [sg.Button("Send",key='seqButton', size=(13, 2), font=('courier', 16))]]
+
+    layout = [[sg.Menu(menu_def, tearoff=False)], 
+                [sg.Column(board_layout),sg.VerticalSeparator(pad=None),sg.Column(board_controls)]]
+
+    return layout
+
+def pcTurn(board,engine):
+    pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
+    sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
+    board.push(pcMove.move)
+    updateBoard(window, sequence)
+    print("White turn: ", board.turn)
+
+def playerTurn(board,squares):
+    result = cl.moveAnalysis(squares, board)
+    if result:
+        if result["type"] == "Promotion":
+            result["move"] += "q"
+        sequence = cl.sequenceGenerator(result["move"], board)
+        board.push_uci(result["move"])
+        updateBoard(window, sequence)
+    else:
+        print("Invalid move!")
+
+def startGame():
+    global psg_board
+    window.FindElement("newGame").Update(disabled=True)
+    window.FindElement("draw").Update(disabled=False)
+    window.FindElement("quit").Update(disabled=False)
+    psg_board = copy.deepcopy(initial_board)
+    redrawBoard()
+    board = cl.chess.Board()
+    engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
+    return board, engine
+
+def quitGame(engine):
+    engine.quit()
+    window.FindElement("newGame").Update(disabled=False)
+    window.FindElement("draw").Update(disabled=True)
+    window.FindElement("quit").Update(disabled=True)
+    playing = False
+
+def chessThread ():
+    if not board.is_game_over() and playing and (not userColor == board.turn):
+        pcTurn(board,engine)
+    elif board.is_game_over() and playing:
+        quitGame(engine)
+        print("GAME OVER")
+
+def test(num1,num2):
+    suma = num1+num2
+    print(suma)
+    return suma
+
+
+layout = mainBoardLayout()
+window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(layout)
 
 def main():
+    
+    squares = []
+    global playing
+    global psg_board
+    board = cl.chess.Board()
+    chessThread = threading.Thread(name='chessThread', target=test, args=(1,3,))
     while True:
-        button, value = window.Read()
-        if button == "newGame":
-            b,v = newGameWindow("OPEN")
-        if conf and b in (None, "Exit"):
-            newGameWindow("CLOSE")
-            
+        button, value = window.Read(timeout=100)
+
+        if button =="newGame" and not playing:
+            print("entro en new")
+            #window.Disable()
+            newGameWindow()
+            #window.Enable()
+            if playing:
+                board, engine = startGame()
+                refTime = time.time()
+                button, value = window.Read(timeout=100)
+                
+
+        if button =="quit" and playing:
+            print("entro en quit")
+            quitGameWindow()
+            if not playing:
+                quitGame(engine) 
+                button, value = window.Read(timeout=100)  
+     
+
+        if button == "seqButton":
+            print("entro en send")
+            print(button,value)
+            squares.append(value[1])
+            squares.append(value[2])
+            squares.append(value[3])
+            squares.append(value[4])
+            print(squares)
+            if not board.is_game_over() and playing and (userColor == board.turn):
+                playerTurn(board, squares)
+            elif board.is_game_over() and playing:
+                quitGame(engine)
+                print("GAME OVER")
+            print(board)
+            squares.clear()
+            button, value = window.Read(timeout=100)
         
-        if button in (None, 'Exit'):
-            break    
+        if playing:
+            now = time.time() - refTime
+            time_string = time.strftime("%H:%M:%S", time.gmtime(now))
+            window["seqButton"].Update(time_string)
+            print(time_string)
+
+        if button in (None, 'Exit'): #MAIN WINDOW
+            break      
+
 
     window.close()    
+
 
 if __name__ == "__main__":
     main()

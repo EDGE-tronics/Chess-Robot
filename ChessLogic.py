@@ -145,10 +145,4 @@ def moveAnalysis (squares, board):
                     result["type"] = "Promotion"
                     return result
 
-    else:
-        if Debug:
-            print(">>> ERROR: Length of square vector > 4 or < 2")
-        else:
-            pass
-
     return result
