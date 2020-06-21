@@ -16,6 +16,9 @@ LightGreen
 Black
 Dark
 '''
+
+#   GLOBAL VARIABLES
+
 CHESS_PATH = 'pieces_images'  # path to the chess pieces
 
 BLANK = 0  # piece names
@@ -60,6 +63,8 @@ kingW = os.path.join(CHESS_PATH, 'nkingw.png')
 images = {BISHOPB: bishopB, BISHOPW: bishopW, PAWNB: pawnB, PAWNW: pawnW, KNIGHTB: knightB, KNIGHTW: knightW,
           ROOKB: rookB, ROOKW: rookW, KINGB: kingB, KINGW: kingW, QUEENB: queenB, QUEENW: queenW, BLANK: blank}
 
+wclock = os.getcwd() + '/interface_images/wclock.png'
+bclock = os.getcwd() + '/interface_images/bclock.png'
 
 graveyard = 'k0'
 userColor = True
@@ -70,15 +75,48 @@ Debug = False
 sequence = []
 state = "stby"
 
+#   GAME FUNCTIONS
 
-def timer():
-   now = time.localtime(time.time())
-   print (now.tm_hour)
-   print (now.tm_min)
-   print (now.tm_sec)
-   return now
+def pcTurn(board,engine):
+    global sequence
+    global state
+    pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
+    sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
+    board.push(pcMove.move)
+    state = "updatePcMove"
+    updateBoard(window, sequence)
 
-def render_square(image, key, location):
+
+def playerTurn(board,squares):
+    result = cl.moveAnalysis(squares, board)
+    if result:
+        if result["type"] == "Promotion":
+            result["move"] += "q"
+        sequence = cl.sequenceGenerator(result["move"], board)
+        board.push_uci(result["move"])
+        updateBoard(window, sequence)
+        return True
+    else:
+        return False
+
+def startGame():
+    global psg_board
+    window.FindElement("newGame").Update(disabled=True)
+    window.FindElement("draw").Update(disabled=False)
+    window.FindElement("quit").Update(disabled=False)
+    psg_board = copy.deepcopy(initial_board)
+    redrawBoard()
+
+
+def quitGame():
+    window.FindElement("newGame").Update(disabled=False)
+    window.FindElement("draw").Update(disabled=True)
+    window.FindElement("quit").Update(disabled=True)
+
+
+#   INTERFACE FUNCTIONS
+
+def renderSquare(image, key, location):
     if (location[0] + location[1]) % 2:
         color =  blackSquareColor
     else:
@@ -197,7 +235,7 @@ def mainBoardLayout():
         row = [sg.T(str(numberRow)+'   ', font='Any 13', key = str(numberRow)+"l")]
         for j in range(8):
             piece_image = images[board[i][j]]
-            row.append(render_square(piece_image, key=(i,j), location=(i,j)))
+            row.append(renderSquare(piece_image, key=(i,j), location=(i,j)))
         row.append(sg.T('   '+str(numberRow), font='Any 13', key = str(numberRow)+"r"))
         board_layout.append(row)
     # add the labels across bottom of board
@@ -209,61 +247,14 @@ def mainBoardLayout():
                         [sg.InputText('' , size=(12, 1))],
                         [sg.InputText('' , size=(12, 1))],
                         [sg.InputText('' , size=(12, 1))],
-                        [sg.Button("Send",key='seqButton', size=(13, 2), font=('courier', 16))]]
+                        [sg.Button('White Time', size=(7, 2), border_width=0,  font=('courier', 16), button_color=('black', whiteSquareColor), pad=(0, 0), key="wt"),sg.Button('Black Time',  font=('courier', 16), size=(7, 2), border_width=0, button_color=('black', blackSquareColor), pad=(0, 0), key="bt")],
+                        [sg.T(" 00:00",size=(6, 2), font=('courier', 16),key="wcount"),sg.T(" 00:00",size=(6, 2), font=('courier', 16),key="bcount")],
+                        [sg.Button('', image_filename=wclock, key='seqButton')]]
 
     layout = [[sg.Menu(menu_def, tearoff=False)], 
                 [sg.Column(board_layout),sg.VerticalSeparator(pad=None),sg.Column(board_controls)]]
 
     return layout
-
-def pcTurn(board,engine):
-    global sequence
-    global state
-    pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
-    sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
-    board.push(pcMove.move)
-    state = "updatePcMove"
-    updateBoard(window, sequence)
-
-
-def playerTurn(board,squares):
-    result = cl.moveAnalysis(squares, board)
-    if result:
-        if result["type"] == "Promotion":
-            result["move"] += "q"
-        sequence = cl.sequenceGenerator(result["move"], board)
-        board.push_uci(result["move"])
-        updateBoard(window, sequence)
-        return True
-    else:
-        return False
-
-def startGame():
-    global psg_board
-    window.FindElement("newGame").Update(disabled=True)
-    window.FindElement("draw").Update(disabled=False)
-    window.FindElement("quit").Update(disabled=False)
-    psg_board = copy.deepcopy(initial_board)
-    redrawBoard()
-
-
-def quitGame():
-    #engine.quit()
-    window.FindElement("newGame").Update(disabled=False)
-    window.FindElement("draw").Update(disabled=True)
-    window.FindElement("quit").Update(disabled=True)
-
-def chessThread ():
-    if not board.is_game_over() and playing and (not userColor == board.turn):
-        pcTurn(board,engine)
-    elif board.is_game_over() and playing:
-        quitGame(engine)
-        print("GAME OVER")
-
-def test(num1,num2):
-    suma = num1+num2
-    print(suma)
-    return suma
 
 
 layout = mainBoardLayout()
@@ -336,9 +327,11 @@ def main():
     global playing
     global sequence
     board = cl.chess.Board()
-    engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
     squares = []
-    
+    refTime = time.time()
+    whiteTime = 0
+    blacktime = 0
+
     while True:
         button, value = window.Read(timeout=100)
         
@@ -353,7 +346,6 @@ def main():
                 state = "returnPos"
 
         if board.is_game_over() and playing:
-            quitGame()
             playing = False
             print("GAME OVER")
             state = "returnPos"
@@ -369,6 +361,9 @@ def main():
                 startGame()
                 board = cl.chess.Board()
                 engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
+                whiteTime = 0
+                blacktime = 0
+                refTime = time.time()
                 if userColor:
                     state = "playerTurn"
                 else:
@@ -393,11 +388,14 @@ def main():
             if value[4]:
                 squares.append(value[4])
             print(squares)
+
             if playerTurn(board, squares):
                 state = "pcTurn"
+                refTime = time.time()
             else:
                 print("INVALID MOVE")
                 state = "playerTurn"
+
             print(board)
             squares.clear()
         
@@ -414,6 +412,7 @@ def main():
         elif state == "robotMove": #Move of piece by robot
             print(state)
             state = "playerTurn"
+            refTime = time.time()
 
         elif state == "returnPos": #Return robotic Arm to zero position
             print(state)
@@ -422,9 +421,17 @@ def main():
         elif state == "showGameResult":
             print(state)
             quitGame()
+            engine.quit()
             state = "stby"
             
-            
+        if playing:
+            dt = time.time() - refTime
+            if board.turn:
+               window.FindElement(key = "wcount").Update(time.strftime(" %M:%S", time.gmtime(dt)))
+            else:
+               window.FindElement(key = "bcount").Update(time.strftime(" %M:%S", time.gmtime(dt)))
+
+
 
 
         if button in (None, 'Exit'): #MAIN WINDOW
