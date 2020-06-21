@@ -67,6 +67,8 @@ playing =  False
 blackSquareColor = '#B58863'
 whiteSquareColor = '#F0D9B5'
 Debug = False
+sequence = []
+state = "stby"
 
 
 def timer():
@@ -149,22 +151,20 @@ def newGameWindow ():
     global playing
     windowName = "Configuration"
     initGame = [[sg.CBox('Play As White', key='userWhite', default = userColor)], [sg.Submit("Save")]]
-    if not playing:
-        while True:
-            windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(initGame)
-            button,value = windowNewGame.Read()
-            if button == "Save":
-                playing = True
-                print("Elegiste blancas:", value["userWhite"])
-                userColor = value["userWhite"]
-                break
-            if button in (None, 'Exit'): #MAIN WINDOW
-                break   
+    windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(initGame)
+    while True:
+        button,value = windowNewGame.Read()
+        if button == "Save":
+            playing = True
+            userColor = value["userWhite"]
+            break
+        if button in (None, 'Exit'): #MAIN WINDOW
+            break   
     windowNewGame.close() 
 
 def quitGameWindow ():
-    global userColor
     global playing
+    global window
     windowName = "Configuration"
     quitGame = [[sg.Text('Are you sure?',justification='center', size=(30, 1), font='Any 13')], [sg.Submit("Yes",  size=(15, 1)),sg.Submit("No", size=(15, 1))]]
     if playing:
@@ -176,7 +176,7 @@ def quitGameWindow ():
                 break
             if button in (None, 'Exit', "No"): #MAIN WINDOW
                 break   
-    windowNewGame.close()     
+    windowNewGame.close()   
 
 def mainBoardLayout():
     # ------ Menu Definition ------ #      
@@ -217,11 +217,14 @@ def mainBoardLayout():
     return layout
 
 def pcTurn(board,engine):
+    global sequence
+    global state
     pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
     sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
     board.push(pcMove.move)
+    state = "updatePcMove"
     updateBoard(window, sequence)
-    print("White turn: ", board.turn)
+
 
 def playerTurn(board,squares):
     result = cl.moveAnalysis(squares, board)
@@ -231,8 +234,9 @@ def playerTurn(board,squares):
         sequence = cl.sequenceGenerator(result["move"], board)
         board.push_uci(result["move"])
         updateBoard(window, sequence)
+        return True
     else:
-        print("Invalid move!")
+        return False
 
 def startGame():
     global psg_board
@@ -241,16 +245,13 @@ def startGame():
     window.FindElement("quit").Update(disabled=False)
     psg_board = copy.deepcopy(initial_board)
     redrawBoard()
-    board = cl.chess.Board()
-    engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
-    return board, engine
 
-def quitGame(engine):
-    engine.quit()
+
+def quitGame():
+    #engine.quit()
     window.FindElement("newGame").Update(disabled=False)
     window.FindElement("draw").Update(disabled=True)
     window.FindElement("quit").Update(disabled=True)
-    playing = False
 
 def chessThread ():
     if not board.is_game_over() and playing and (not userColor == board.turn):
@@ -268,6 +269,8 @@ def test(num1,num2):
 layout = mainBoardLayout()
 window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(layout)
 
+
+'''
 def main():
     
     squares = []
@@ -325,6 +328,109 @@ def main():
 
 
     window.close()    
+'''
+
+def main():
+    global userColor
+    global state
+    global playing
+    global sequence
+    board = cl.chess.Board()
+    engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
+    squares = []
+    
+    while True:
+        button, value = window.Read(timeout=100)
+        
+        if button =="newGame":
+            print("entro en new")
+            state = "startMenu"
+        
+        if button =="quit":
+            print("entro en quit")
+            quitGameWindow()
+            if not playing:
+                state = "returnPos"
+
+        if board.is_game_over() and playing:
+            quitGame()
+            playing = False
+            print("GAME OVER")
+            state = "returnPos"
+
+
+        if state == "stby": #stby
+            print(state)
+
+        elif state == "startMenu": #Start Menu
+            print(state)
+            newGameWindow()
+            if playing:
+                startGame()
+                board = cl.chess.Board()
+                engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
+                if userColor:
+                    state = "playerTurn"
+                else:
+                    state = "pcTurn"
+            else:
+                state = "stby"
+
+        elif state == "playerTurn": #Player Turn
+            print(state)
+            
+            if button == "seqButton":
+                print("entro en send")
+                state = "moveDetection"
+
+        elif state == "moveDetection": #Computer vision movement detection and move Validation
+            print(state)
+            print(button,value)
+            squares.append(value[1])
+            squares.append(value[2])
+            if value[3]:
+                squares.append(value[3])
+            if value[4]:
+                squares.append(value[4])
+            print(squares)
+            if playerTurn(board, squares):
+                state = "pcTurn"
+            else:
+                print("INVALID MOVE")
+                state = "playerTurn"
+            print(board)
+            squares.clear()
+        
+        elif state == "pcTurn": #PC turn
+            print(state)
+            processThread = threading.Thread(target=pcTurn, args=(board,engine,), daemon=True)
+            processThread.start()
+            state = "stby" #need wait for pc movment, the deamon change the state
+
+        elif state == "updatePcMove": #PC turn
+            print(state)
+            state = "robotMove"
+
+        elif state == "robotMove": #Move of piece by robot
+            print(state)
+            state = "playerTurn"
+
+        elif state == "returnPos": #Return robotic Arm to zero position
+            print(state)
+            state = "showGameResult"
+
+        elif state == "showGameResult":
+            print(state)
+            quitGame()
+            state = "stby"
+            
+            
+
+
+        if button in (None, 'Exit'): #MAIN WINDOW
+            break      
+
+    window.close() 
 
 
 if __name__ == "__main__":
