@@ -249,7 +249,7 @@ def mainBoardLayout():
                         [sg.InputText('' , size=(12, 1))],
                         [sg.Button('White Time', size=(7, 2), border_width=0,  font=('courier', 16), button_color=('black', whiteSquareColor), pad=(0, 0), key="wt"),sg.Button('Black Time',  font=('courier', 16), size=(7, 2), border_width=0, button_color=('black', blackSquareColor), pad=(0, 0), key="bt")],
                         [sg.T(" 00:00",size=(6, 2), font=('courier', 16),key="wcount"),sg.T(" 00:00",size=(6, 2), font=('courier', 16),key="bcount")],
-                        [sg.Button('', image_filename=wclock, key='seqButton')]]
+                        [sg.Button('', image_filename=wclock, key='clockButton', pad = ((22,0),0))]]
 
     layout = [[sg.Menu(menu_def, tearoff=False)], 
                 [sg.Column(board_layout),sg.VerticalSeparator(pad=None),sg.Column(board_controls)]]
@@ -291,7 +291,7 @@ def main():
                 button, value = window.Read(timeout=100)  
      
 
-        if button == "seqButton":
+        if button == "clockButton":
             print("entro en send")
             print(button,value)
             squares.append(value[1])
@@ -311,7 +311,7 @@ def main():
         if playing:
             now = time.time() - refTime
             time_string = time.strftime("%H:%M:%S", time.gmtime(now))
-            window["seqButton"].Update(time_string)
+            window["clockButton"].Update(time_string)
             print(time_string)
 
         if button in (None, 'Exit'): #MAIN WINDOW
@@ -328,9 +328,10 @@ def main():
     global sequence
     board = cl.chess.Board()
     squares = []
-    refTime = time.time()
     whiteTime = 0
-    blacktime = 0
+    blackTime = 0
+    gameTime = 180.00
+    refTime = time.time()
 
     while True:
         button, value = window.Read(timeout=100)
@@ -345,7 +346,7 @@ def main():
             if not playing:
                 state = "returnPos"
 
-        if board.is_game_over() and playing:
+        if (board.is_game_over() or whiteTime <= 0 or blackTime <= 0) and playing:
             playing = False
             print("GAME OVER")
             state = "returnPos"
@@ -361,8 +362,11 @@ def main():
                 startGame()
                 board = cl.chess.Board()
                 engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
-                whiteTime = 0
-                blacktime = 0
+                window.FindElement(key = "wcount").Update(time.strftime(" %M:%S", time.gmtime(gameTime)))
+                window.FindElement(key = "bcount").Update(time.strftime(" %M:%S", time.gmtime(gameTime)))
+                window.FindElement(key = "clockButton").Update(image_filename=wclock)
+                whiteTime = gameTime
+                blackTime = gameTime
                 refTime = time.time()
                 if userColor:
                     state = "playerTurn"
@@ -373,8 +377,7 @@ def main():
 
         elif state == "playerTurn": #Player Turn
             print(state)
-            
-            if button == "seqButton":
+            if button == "clockButton":
                 print("entro en send")
                 state = "moveDetection"
 
@@ -391,7 +394,6 @@ def main():
 
             if playerTurn(board, squares):
                 state = "pcTurn"
-                refTime = time.time()
             else:
                 print("INVALID MOVE")
                 state = "playerTurn"
@@ -401,6 +403,11 @@ def main():
         
         elif state == "pcTurn": #PC turn
             print(state)
+            
+            if board.turn:
+                window.FindElement(key = "clockButton").Update(image_filename=wclock)
+            else:
+                window.FindElement(key = "clockButton").Update(image_filename=bclock)
             processThread = threading.Thread(target=pcTurn, args=(board,engine,), daemon=True)
             processThread.start()
             state = "stby" #need wait for pc movment, the deamon change the state
@@ -412,7 +419,10 @@ def main():
         elif state == "robotMove": #Move of piece by robot
             print(state)
             state = "playerTurn"
-            refTime = time.time()
+            if board.turn:
+                window.FindElement(key = "clockButton").Update(image_filename=wclock)
+            else:
+                window.FindElement(key = "clockButton").Update(image_filename=bclock)
 
         elif state == "returnPos": #Return robotic Arm to zero position
             print(state)
@@ -427,9 +437,13 @@ def main():
         if playing:
             dt = time.time() - refTime
             if board.turn:
-               window.FindElement(key = "wcount").Update(time.strftime(" %M:%S", time.gmtime(dt)))
+                whiteTime = whiteTime - dt
+                refTime = time.time()
+                window.FindElement(key = "wcount").Update(time.strftime(" %M:%S", time.gmtime(whiteTime)))
             else:
-               window.FindElement(key = "bcount").Update(time.strftime(" %M:%S", time.gmtime(dt)))
+                blackTime = blackTime - dt
+                refTime = time.time()
+                window.FindElement(key = "bcount").Update(time.strftime(" %M:%S", time.gmtime(blackTime)))
 
 
 
