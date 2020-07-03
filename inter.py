@@ -74,6 +74,8 @@ whiteSquareColor = '#F0D9B5'
 Debug = False
 sequence = []
 state = "stby"
+gameTime = 60.00
+
 
 #   GAME FUNCTIONS
 
@@ -82,6 +84,7 @@ def pcTurn(board,engine):
     global state
     pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
     sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
+    window.FindElement(key = "gameMessage").Update(sequence["type"])
     board.push(pcMove.move)
     state = "updatePcMove"
     updateBoard(window, sequence)
@@ -93,6 +96,7 @@ def playerTurn(board,squares):
         if result["type"] == "Promotion":
             result["move"] += "q"
         sequence = cl.sequenceGenerator(result["move"], board)
+        window.FindElement(key = "gameMessage").Update(sequence["type"])
         board.push_uci(result["move"])
         updateBoard(window, sequence)
         return True
@@ -102,7 +106,6 @@ def playerTurn(board,squares):
 def startGame():
     global psg_board
     window.FindElement("newGame").Update(disabled=True)
-    window.FindElement("draw").Update(disabled=False)
     window.FindElement("quit").Update(disabled=False)
     psg_board = copy.deepcopy(initial_board)
     redrawBoard()
@@ -110,7 +113,6 @@ def startGame():
 
 def quitGame():
     window.FindElement("newGame").Update(disabled=False)
-    window.FindElement("draw").Update(disabled=True)
     window.FindElement("quit").Update(disabled=True)
 
 
@@ -187,14 +189,20 @@ def updateBoard(window, move):
 def newGameWindow ():
     global userColor
     global playing
+    global gameTime
     windowName = "Configuration"
-    initGame = [[sg.CBox('Play As White', key='userWhite', default = userColor)], [sg.Submit("Save")]]
+    initGame = [[sg.Text('Game Parameters', justification='center', pad = (25,(5,15)), font='Any 15')],
+                [sg.CBox('Play As White', key='userWhite', default = userColor)],
+                [sg.Spin([sz for sz in range(1, 300)], initial_value=1, font='Any 11',key='timeInput'),sg.Text('Time in minutes', pad=(0,0))],
+                [sg.Text('_'*30)],
+                [sg.Button("Back"), sg.Submit("Next")]]
     windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(initGame)
     while True:
         button,value = windowNewGame.Read()
-        if button == "Save":
+        if button == "Next":
             playing = True
             userColor = value["userWhite"]
+            gameTime = float(value["timeInput"]*60)
             break
         if button in (None, 'Exit'): #MAIN WINDOW
             break   
@@ -241,15 +249,23 @@ def mainBoardLayout():
     # add the labels across bottom of board
     board_layout.append([sg.T(' '*12)] + [sg.T('{}'.format(a), pad=((0,47),0), font='Any 13', key = a+'b') for a in 'abcdefgh'])
 
-    board_controls = [[sg.RButton('New Game', key='newGame', size=(13, 2), font=('courier', 16))],
-                        [sg.RButton('Quit', key='quit', size=(6, 2), font=('courier', 16), disabled = True),sg.RButton('Draw', key='draw', size=(6, 2), font=('courier', 16), disabled = True)],
+    frame_layout_game = [
+                [sg.Button('---', size=(14, 2), border_width=0,  font=('courier', 16), button_color=('black', "white"), pad=(4, 4), key="gameMessage")],
+               ]
+    frame_layout_robot = [
+                [sg.Button('---', size=(14, 2), border_width=0,  font=('courier', 16), button_color=('black', "white"), pad=(4, 4), key="robotMessage")],
+                ]
+    board_controls = [[sg.RButton('New Game', key='newGame', size=(15, 2), pad=(0,(0,7)), font=('courier', 16))],
+                        [sg.RButton('Quit', key='quit', size=(15, 2), pad=(0, 0), font=('courier', 16), disabled = True)],
+                        [sg.Frame('GAME', frame_layout_game, pad=(0, 10), font='Any 12', title_color='white', key = "frameMessageGame")],
+                        [sg.Frame('ROBOT', frame_layout_robot, pad=(0, (0,10)), font='Any 12', title_color='white', key = "frameMessageRobot")],
                         [sg.InputText('' , size=(12, 1))],
                         [sg.InputText('' , size=(12, 1))],
                         [sg.InputText('' , size=(12, 1))],
                         [sg.InputText('' , size=(12, 1))],
-                        [sg.Button('White Time', size=(7, 2), border_width=0,  font=('courier', 16), button_color=('black', whiteSquareColor), pad=(0, 0), key="wt"),sg.Button('Black Time',  font=('courier', 16), size=(7, 2), border_width=0, button_color=('black', blackSquareColor), pad=(0, 0), key="bt")],
-                        [sg.T(" 00:00",size=(6, 2), font=('courier', 16),key="wcount"),sg.T(" 00:00",size=(6, 2), font=('courier', 16),key="bcount")],
-                        [sg.Button('', image_filename=wclock, key='clockButton', pad = ((22,0),0))]]
+                        [sg.Button('White Time', size=(7, 2), border_width=0,  font=('courier', 16), button_color=('black', whiteSquareColor), pad=(0, 0), key="wt"),sg.Button('Black Time',  font=('courier', 16), size=(7, 2), border_width=0, button_color=('black', blackSquareColor), pad=((7,0), 0), key="bt")],
+                        [sg.T("00:00:00",size=(9, 2), font=('courier', 13),key="wcount",pad = ((4,0),0)),sg.T("00:00:00",size=(9, 2), pad = (0,0), font=('courier', 13),key="bcount")],
+                        [sg.Button('', image_filename=wclock, key='clockButton', pad = ((25,0),0))]]
 
     layout = [[sg.Menu(menu_def, tearoff=False)], 
                 [sg.Column(board_layout),sg.VerticalSeparator(pad=None),sg.Column(board_controls)]]
@@ -261,76 +277,16 @@ layout = mainBoardLayout()
 window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(layout)
 
 
-'''
-def main():
-    
-    squares = []
-    global playing
-    global psg_board
-    board = cl.chess.Board()
-    chessThread = threading.Thread(name='chessThread', target=test, args=(1,3,))
-    while True:
-        button, value = window.Read(timeout=100)
-
-        if button =="newGame" and not playing:
-            print("entro en new")
-            #window.Disable()
-            newGameWindow()
-            #window.Enable()
-            if playing:
-                board, engine = startGame()
-                refTime = time.time()
-                button, value = window.Read(timeout=100)
-                
-
-        if button =="quit" and playing:
-            print("entro en quit")
-            quitGameWindow()
-            if not playing:
-                quitGame(engine) 
-                button, value = window.Read(timeout=100)  
-     
-
-        if button == "clockButton":
-            print("entro en send")
-            print(button,value)
-            squares.append(value[1])
-            squares.append(value[2])
-            squares.append(value[3])
-            squares.append(value[4])
-            print(squares)
-            if not board.is_game_over() and playing and (userColor == board.turn):
-                playerTurn(board, squares)
-            elif board.is_game_over() and playing:
-                quitGame(engine)
-                print("GAME OVER")
-            print(board)
-            squares.clear()
-            button, value = window.Read(timeout=100)
-        
-        if playing:
-            now = time.time() - refTime
-            time_string = time.strftime("%H:%M:%S", time.gmtime(now))
-            window["clockButton"].Update(time_string)
-            print(time_string)
-
-        if button in (None, 'Exit'): #MAIN WINDOW
-            break      
-
-
-    window.close()    
-'''
-
 def main():
     global userColor
     global state
     global playing
     global sequence
+    interfaceMessage = ""
     board = cl.chess.Board()
     squares = []
     whiteTime = 0
     blackTime = 0
-    gameTime = 180.00
     refTime = time.time()
 
     while True:
@@ -346,11 +302,30 @@ def main():
             if not playing:
                 state = "returnPos"
 
-        if (board.is_game_over() or whiteTime <= 0 or blackTime <= 0) and playing:
-            playing = False
-            print("GAME OVER")
-            state = "returnPos"
 
+        #machine messages
+        if playing:
+            if board.is_game_over():
+                playing = False
+                print("GAME OVER")
+                state = "returnPos"
+                window.FindElement(key = "gameMessage").Update("Game Over")
+            elif  whiteTime <= 0:
+                playing = False
+                print("GAME OVER")
+                state = "returnPos"
+                window.FindElement(key = "gameMessage").Update("Time Out\n"+"Black Wins")
+            elif  blackTime <= 0:
+                playing = False
+                print("GAME OVER")
+                state = "returnPos"
+                window.FindElement(key = "gameMessage").Update("Time Out\n"+ "White Wins")
+                window.FindElement(key = "gameMessage").Update("---")
+            elif board.is_check() and (not userColor == board.turn): #if robot make check
+                window.FindElement(key = "robotMessage").Update("CHECK!")
+
+
+        
 
         if state == "stby": #stby
             print(state)
@@ -362,9 +337,10 @@ def main():
                 startGame()
                 board = cl.chess.Board()
                 engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
-                window.FindElement(key = "wcount").Update(time.strftime(" %M:%S", time.gmtime(gameTime)))
-                window.FindElement(key = "bcount").Update(time.strftime(" %M:%S", time.gmtime(gameTime)))
+                window.FindElement(key = "wcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
+                window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
                 window.FindElement(key = "clockButton").Update(image_filename=wclock)
+                window.FindElement(key = "gameMessage").Update("Good Luck!")
                 whiteTime = gameTime
                 blackTime = gameTime
                 refTime = time.time()
@@ -419,6 +395,7 @@ def main():
         elif state == "robotMove": #Move of piece by robot
             print(state)
             state = "playerTurn"
+            window.FindElement(key = "robotMessage").Update("---")
             if board.turn:
                 window.FindElement(key = "clockButton").Update(image_filename=wclock)
             else:
@@ -438,12 +415,16 @@ def main():
             dt = time.time() - refTime
             if board.turn:
                 whiteTime = whiteTime - dt
+                if whiteTime < 0:
+                    whiteTime = 0
                 refTime = time.time()
-                window.FindElement(key = "wcount").Update(time.strftime(" %M:%S", time.gmtime(whiteTime)))
+                window.FindElement(key = "wcount").Update(time.strftime("%H:%M:%S", time.gmtime(whiteTime)))
             else:
                 blackTime = blackTime - dt
+                if blackTime < 0:
+                    blackTime = 0
                 refTime = time.time()
-                window.FindElement(key = "bcount").Update(time.strftime(" %M:%S", time.gmtime(blackTime)))
+                window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(blackTime)))
 
 
 
