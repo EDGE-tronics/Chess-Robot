@@ -1,12 +1,12 @@
+import os
 import ChessLogic as cl
 import VisionModule as vm
 
 Debug = True
 
 # Test route:
-route = 'C:/Users/geral/Dropbox/Robot_Arm/ChessRobot/test_images/'
-print(route)
-print("############################ CHECK IMAGES ROUTE!! ############################")
+route = os.getcwd() + '/'
+print("The route is: ",route)
 
 ## TEST FUNCTION FOR MOVEMENT SEQUENCE GENERATION
 def main():  
@@ -19,7 +19,7 @@ def main():
     cbPattern = vm.cv2.imread(route+'cbPattern.jpg', vm.cv2.IMREAD_GRAYSCALE)
     ## calibrateCam
     input("Please place the chessboard without the chess pieces and press enter\n")
-    img1 = vm.cv2.imread(route+'board.png')
+    img1 = vm.cv2.imread(route + 'board.png')
     retIMG, homMat = vm.findTransformation(img1,cbPattern)
     ## findWhite
     input("Please place the chess pieces, press enter, check image and press enter\n")
@@ -61,7 +61,7 @@ def main():
         squares = vm.findMoves(H1, H2)
 
         result = cl.moveAnalysis(squares, board)
-        if result:
+        while result:
             print("Move detected: ")
             print(result)
             if result["type"] == "Promotion":
