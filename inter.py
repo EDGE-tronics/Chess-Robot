@@ -87,6 +87,8 @@ def pcTurn(board,engine):
     window.FindElement(key = "gameMessage").Update(sequence["type"])
     board.push(pcMove.move)
     state = "updatePcMove"
+    if board.is_check():
+        window.FindElement(key = "robotMessage").Update("CHECK!")
     updateBoard(window, sequence)
 
 
@@ -309,7 +311,6 @@ def main():
                 playing = False
                 print("GAME OVER")
                 state = "returnPos"
-                window.FindElement(key = "gameMessage").Update("Game Over")
             elif  whiteTime <= 0:
                 playing = False
                 print("GAME OVER")
@@ -320,12 +321,7 @@ def main():
                 print("GAME OVER")
                 state = "returnPos"
                 window.FindElement(key = "gameMessage").Update("Time Out\n"+ "White Wins")
-                window.FindElement(key = "gameMessage").Update("---")
-            elif board.is_check() and (not userColor == board.turn): #if robot make check
-                window.FindElement(key = "robotMessage").Update("CHECK!")
-
-
-        
+       
 
         if state == "stby": #stby
             print(state)
@@ -388,7 +384,7 @@ def main():
             processThread.start()
             state = "stby" #need wait for pc movment, the deamon change the state
 
-        elif state == "updatePcMove": #PC turn
+        elif state == "updatePcMove": #PC turn, make the robot movement in this state
             print(state)
             state = "robotMove"
 
@@ -407,6 +403,13 @@ def main():
 
         elif state == "showGameResult":
             print(state)
+            gameResult = board.result()
+            if gameResult == "1-0":
+                window.FindElement(key = "gameMessage").Update("Game Over" + "\nWhite Wins")
+            elif gameResult == "0-1":
+                window.FindElement(key = "gameMessage").Update("Game Over" + "\nBlack Wins")
+            elif gameResult == "1/2-1/2":
+                window.FindElement(key = "gameMessage").Update("Game Over" + "\nDraw")
             quitGame()
             engine.quit()
             state = "stby"
@@ -425,9 +428,6 @@ def main():
                     blackTime = 0
                 refTime = time.time()
                 window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(blackTime)))
-
-
-
 
         if button in (None, 'Exit'): #MAIN WINDOW
             break      
