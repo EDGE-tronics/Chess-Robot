@@ -5,7 +5,10 @@ import os
 import copy
 import threading
 import time
-
+import cv2 as cv
+from PIL import Image
+import io
+from sys import exit as exit
 
 '''
 styles:
@@ -74,8 +77,8 @@ whiteSquareColor = '#F0D9B5'
 Debug = False
 sequence = []
 state = "stby"
+newGameState = "config"
 gameTime = 60.00
-
 
 #   GAME FUNCTIONS
 
@@ -188,32 +191,72 @@ def updateBoard(window, move):
             elem.Update(button_color=('white', color),
                         image_filename=piece_image, )         
 
+
+def boardCapture():
+    global newGameState
+    global state
+
+    windowName = "Board"
+    initGame = [[sg.Text('Please, show the board empty', justification='center', pad = (25,(5,15)), font='Any 15')],
+                [sg.Image(filename='', key='boardVideo')],
+                [sg.Text('_'*30)],
+                [sg.Button("Back"), sg.Submit("Next")]]
+    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(initGame) 
+    cap = cv.VideoCapture(0)
+    while True:
+        button,value = newGameWindow.Read(timeout=10)
+        if button == "Next":
+            newGameState = "initGame"
+            break
+        if button == "Back":
+            newGameState = "config"
+            break
+        if button in (None, 'Exit'): #MAIN WINDOW
+            state = "stby"
+            newGameState = "config"
+            break   
+        
+        ret, frame = cap.read()
+
+        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+
+        # let img be the PIL image
+        img = Image.fromarray(gray)  # create PIL image from frame
+        bio = io.BytesIO()  # a binary memory resident stream
+        img.save(bio, format= 'PNG')  # save image as png to it
+        imgbytes = bio.getvalue()  # this can be used by OpenCV hopefully
+        newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
+
+    newGameWindow.close() 
+
 def newGameWindow ():
     global userColor
-    global playing
     global gameTime
+    global newGameState
+    global state
     windowName = "Configuration"
     initGame = [[sg.Text('Game Parameters', justification='center', pad = (25,(5,15)), font='Any 15')],
                 [sg.CBox('Play As White', key='userWhite', default = userColor)],
                 [sg.Spin([sz for sz in range(1, 300)], initial_value=1, font='Any 11',key='timeInput'),sg.Text('Time in minutes', pad=(0,0))],
                 [sg.Text('_'*30)],
-                [sg.Button("Back"), sg.Submit("Next")]]
+                [sg.Button("Exit"), sg.Submit("Next")]]
     windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(initGame)
     while True:
         button,value = windowNewGame.Read()
         if button == "Next":
-            playing = True
+            newGameState = "boardCapture"
             userColor = value["userWhite"]
             gameTime = float(value["timeInput"]*60)
             break
         if button in (None, 'Exit'): #MAIN WINDOW
+            state = "stby"
             break   
     windowNewGame.close() 
 
 def quitGameWindow ():
     global playing
     global window
-    windowName = "Configuration"
+    windowName = "Quit Game"
     quitGame = [[sg.Text('Are you sure?',justification='center', size=(30, 1), font='Any 13')], [sg.Submit("Yes",  size=(15, 1)),sg.Submit("No", size=(15, 1))]]
     if playing:
         while True:
@@ -230,7 +273,6 @@ def mainBoardLayout():
     # ------ Menu Definition ------ #      
     menu_def = [['Properties'],      
                 ['Help', 'About...'], ]  
-
 
     # ------ Layout ------ # 
     # sg.SetOptions(margins=(0,0))
@@ -284,6 +326,7 @@ def main():
     global state
     global playing
     global sequence
+    global newGameState
     interfaceMessage = ""
     board = cl.chess.Board()
     squares = []
@@ -303,7 +346,6 @@ def main():
             quitGameWindow()
             if not playing:
                 state = "returnPos"
-
 
         #machine messages
         if playing:
@@ -328,8 +370,14 @@ def main():
 
         elif state == "startMenu": #Start Menu
             print(state)
-            newGameWindow()
-            if playing:
+
+            if newGameState == "config":
+                newGameWindow()
+            elif newGameState == "boardCapture":
+                boardCapture()
+            elif newGameState == "initGame":
+                playing = True
+                newGameState = "config"
                 startGame()
                 board = cl.chess.Board()
                 engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
@@ -344,9 +392,6 @@ def main():
                     state = "playerTurn"
                 else:
                     state = "pcTurn"
-            else:
-                state = "stby"
-
         elif state == "playerTurn": #Player Turn
             print(state)
             if button == "clockButton":
