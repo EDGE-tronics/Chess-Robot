@@ -5,10 +5,10 @@ import os
 import copy
 import threading
 import time
-import cv2 as cv
+import cv2
 from PIL import Image
 import io
-from sys import exit as exit
+import sys
 
 '''
 styles:
@@ -79,6 +79,9 @@ sequence = []
 state = "stby"
 newGameState = "config"
 gameTime = 60.00
+playerSide = 0      # 1-2 (0), 2-3 (1), 3-4 (2), 4-1 (3)
+engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
+
 
 #   GAME FUNCTIONS
 
@@ -93,6 +96,15 @@ def pcTurn(board,engine):
     if board.is_check():
         window.FindElement(key = "robotMessage").Update("CHECK!")
     updateBoard(window, sequence)
+
+def startEngine():
+    global engine
+    global state
+    engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
+    if userColor:
+        state = "playerTurn"
+    else:
+        state = "pcTurn"
 
 
 def playerTurn(board,squares):
@@ -191,22 +203,90 @@ def updateBoard(window, move):
             elem.Update(button_color=('white', color),
                         image_filename=piece_image, )         
 
+def sideConfig(): #gameState: sideConfig
+    global newGameState
+    global state
+    global playerSide
+    i = 0
+    windowName = "Calibration"
+    initGame = [[sg.Text('Please, Choose your side', justification='center', pad = (25,(5,15)), font='Any 15')],
+                [sg.Image(filename='', key='boardVideo')],
+                [sg.Radio('1-2', group_id='grp'), sg.Radio('2-3', group_id='grp'),sg.Radio('3-4', group_id='grp'), sg.Radio('4-1', group_id='grp')],
+                [sg.Text('_'*30)],
+                [sg.Button("Back"), sg.Submit("Next")]]
+    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, location = (100,50), icon='kingb.ico').Layout(initGame) 
+    #cap = cv2.VideoCapture(0)
+    while True:
+        button,value = newGameWindow.Read()
+        #ret, frame = cap.read()
+        if button == "Next":
+            newGameState = "initGame"
+            while value[i] == False:
+                i+=1
+            playerSide = i
+            print(playerSide)
+            #cv2.imwrite(os.getcwd() + "/testImage.png", frame)
+            break
+        if button == "Back":
+            newGameState = "ocupiedBoard"
+            break
+        if button in (None, 'Exit'): #MAIN WINDOW
+            state = "stby"
+            newGameState = "config"
+            break   
+        
+        #imgbytes = cv2.imencode('.png', frame)[1].tobytes()  # ditto
+        #newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
+    newGameWindow.close()
 
-def boardCapture():
+def ocupiedBoard(): #gameState: ocupiedBoard
     global newGameState
     global state
 
-    windowName = "Board"
+    windowName = "Calibration"
+    initGame = [[sg.Text('Please, show the board with pieces', justification='center', pad = (25,(5,15)), font='Any 15')],
+                [sg.Image(filename='', key='boardVideo')],
+                [sg.Text('_'*30)],
+                [sg.Button("Back"), sg.Submit("Next")]]
+    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, location = (100,50), icon='kingb.ico').Layout(initGame) 
+    #cap = cv2.VideoCapture(0)
+    while True:
+        button,value = newGameWindow.Read()
+        #ret, frame = cap.read()
+        if button == "Next":
+            newGameState = "sideConfig"
+            #cv2.imwrite(os.getcwd() + "/testImage.png", frame)
+            break
+        if button == "Back":
+            newGameState = "calibration"
+            break
+        if button in (None, 'Exit'): #MAIN WINDOW
+            state = "stby"
+            newGameState = "config"
+            break   
+        
+        #imgbytes = cv2.imencode('.png', frame)[1].tobytes()  # ditto
+        #newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
+
+    newGameWindow.close()
+
+def calibration(): #gameState: calibration
+    global newGameState
+    global state
+
+    windowName = "Calibration"
     initGame = [[sg.Text('Please, show the board empty', justification='center', pad = (25,(5,15)), font='Any 15')],
                 [sg.Image(filename='', key='boardVideo')],
                 [sg.Text('_'*30)],
                 [sg.Button("Back"), sg.Submit("Next")]]
-    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(initGame) 
-    cap = cv.VideoCapture(0)
+    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, location = (100,50), icon='kingb.ico').Layout(initGame) 
+    #cap = cv2.VideoCapture(0)
     while True:
-        button,value = newGameWindow.Read(timeout=10)
+        button,value = newGameWindow.Read(timeout = 10)
+        #ret, frame = cap.read()
         if button == "Next":
-            newGameState = "initGame"
+            newGameState = "ocupiedBoard"
+            #cv2.imwrite(os.getcwd() + "/testImage.jpeg", frame)
             break
         if button == "Back":
             newGameState = "config"
@@ -216,20 +296,12 @@ def boardCapture():
             newGameState = "config"
             break   
         
-        ret, frame = cap.read()
-
-        gray = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
-
-        # let img be the PIL image
-        img = Image.fromarray(gray)  # create PIL image from frame
-        bio = io.BytesIO()  # a binary memory resident stream
-        img.save(bio, format= 'PNG')  # save image as png to it
-        imgbytes = bio.getvalue()  # this can be used by OpenCV hopefully
-        newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
+        #imgbytes = cv2.imencode('.png', frame)[1].tobytes()  # ditto
+        #newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
 
     newGameWindow.close() 
 
-def newGameWindow ():
+def newGameWindow (): #gameState: config
     global userColor
     global gameTime
     global newGameState
@@ -244,7 +316,7 @@ def newGameWindow ():
     while True:
         button,value = windowNewGame.Read()
         if button == "Next":
-            newGameState = "boardCapture"
+            newGameState = "calibration"
             userColor = value["userWhite"]
             gameTime = float(value["timeInput"]*60)
             break
@@ -363,24 +435,25 @@ def main():
                 print("GAME OVER")
                 state = "returnPos"
                 window.FindElement(key = "gameMessage").Update("Time Out\n"+ "White Wins")
-       
 
         if state == "stby": #stby
             print(state)
 
         elif state == "startMenu": #Start Menu
             print(state)
-
             if newGameState == "config":
                 newGameWindow()
-            elif newGameState == "boardCapture":
-                boardCapture()
+            elif newGameState == "calibration":
+                calibration()
+            elif newGameState == "ocupiedBoard":
+                ocupiedBoard()
+            elif newGameState == "sideConfig":
+                sideConfig()
             elif newGameState == "initGame":
                 playing = True
                 newGameState = "config"
                 startGame()
                 board = cl.chess.Board()
-                engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
                 window.FindElement(key = "wcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
                 window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
                 window.FindElement(key = "clockButton").Update(image_filename=wclock)
@@ -388,10 +461,11 @@ def main():
                 whiteTime = gameTime
                 blackTime = gameTime
                 refTime = time.time()
-                if userColor:
-                    state = "playerTurn"
-                else:
-                    state = "pcTurn"
+
+                processThread = threading.Thread(target=startEngine, daemon=True)
+                processThread.start()
+                state = "stby"
+                
         elif state == "playerTurn": #Player Turn
             print(state)
             if button == "clockButton":
@@ -478,6 +552,8 @@ def main():
             break      
 
     window.close() 
+    sys.exit()
+
 
 
 if __name__ == "__main__":
