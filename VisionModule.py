@@ -1,8 +1,9 @@
+# from picamera.array import PiRGBArray
+# from picamera import PiCamera
 import cv2
 import numpy as np
 import string
 import time
-
 
 def findTransformation(img,cbPattern):
 
@@ -12,30 +13,42 @@ def findTransformation(img,cbPattern):
     # Find chessboard corners
     retCB, cornersCB = cv2.findChessboardCorners(cbPattern, patternSize, cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FAST_CHECK + cv2.CALIB_CB_NORMALIZE_IMAGE)
     retIMG, cornersIMG = cv2.findChessboardCorners(imgGray, patternSize, cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FAST_CHECK + cv2.CALIB_CB_NORMALIZE_IMAGE)
+    
     if retIMG == 0:
-        print("Couldn't find chessboard, please remove any chess piece")
+        print("Couldn't find chessboard, please adjust your camera and remove any chess piece")
         H = 0
     else:
-        # Find homography matrix
-        H, _ = cv2.findHomography(cornersIMG, cornersCB)
+        H, _ = cv2.findHomography(cornersIMG, cornersCB)     # Find the transformation matrix
     
     return(retIMG, H)
 
-def calibrateCam(cam):
+def calibrateCam(cam,type):
 
     input("Please place the chessboard without the chess pieces and press key")
-
-    # # Allow the camera to warmup and adjust lightning
-    img = cam.read()
-    time.sleep(7)
+    cbPattern = cv2.imread('../cb_pattern.jpg', cv2.IMREAD_GRAYSCALE)
+    
+    # Allow the camera to warmup
+    if type == 0:                   # Raspberry Camera module
+        rawCapture = PiRGBArray(cam, size=(640, 480))
+        time.sleep(0.2)
+    elif type == 1:                 # USB Camera
+        _, img = cam.read()
+        time.sleep(2)
 
     # Check video frames until the algorithm finds the chessboard corners
     retIMG = 0
     while(retIMG == 0):
-        ret, img = cam.read()
-        if ret:
-            retIMG, H = findTransformation(img)
+        if type == 0:                   # Raspberry Camera module
+            cam.capture(rawCapture, format="bgr")
+            img = rawCapture.array
+            rawCapture.truncate(0)      # Clear the stream in preparation for the next image
+        elif type == 1:
+            img = cam.read()
+        cv2.imshow('Calibration', img)
+        cv2.waitKey(1)
+        retIMG, H = findTransformation(img,cbPattern)
 
+    cv2.destroyAllWindows()
     print("\nCamera calibration succesful\n")
 
     warpIMG = cv2.warpPerspective(img, H, (400, 400))
@@ -56,17 +69,23 @@ def drawQuadrants(img):
     cv2.waitKey()
     cv2.destroyAllWindows()
 
-def findWhite(cam, H):
+def findWhite(cam,type,H):
 
     input("Please place the chess pieces and press key")
     cv2.waitKey()
 
     # Get frame
-    ret, frame = cam.read()
-    assert ret, "Couldn't take picture"
-
+    if type == 0:                   # Raspberry Camera module
+        rawCapture = PiRGBArray(cam, size=(640, 480))
+        cam.capture(rawCapture, format="bgr")
+        img = rawCapture.array
+        time.sleep(1)
+    elif type == 1:                 # USB Camera
+        img = cam.read()
+        time.sleep(7)
+    
     # Apply homography transformation
-    warpIMG = cv2.warpPerspective(frame, H, (400, 400))
+    warpIMG = cv2.warpPerspective(img, H, (400, 400))
 
     # Draw quedrants and numbers on image
     drawQuadrants(warpIMG)
@@ -140,3 +159,22 @@ def findMoves(img1, img2):
     print(coordinates)
     
     return(coordinates)
+
+def safetoMove(H):
+    #cap = cv2.VideoCapture(1)
+    ret, img = cap.read()
+    img = cv2.warpPerspective(img, H, (cbPattern.shape[1], cbPattern.shape[0]))
+
+    # Kmeans algorithm (Map the image to only two colors)
+    K = 2
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+    Z = np.float32(img.reshape((-1,3)))
+    ret,label,center=cv2.kmeans(Z,K,None,criteria,10,cv2.KMEANS_RANDOM_CENTERS)
+    center = np.uint8(center)
+    res = center[label.flatten()].reshape((img.shape))
+    imgGRAY = cv2.cvtColor(res,cv2.COLOR_BGR2GRAY)
+
+    # Try to find chessboard corners (if there's an obstacle it won't be able to do so)
+    retIMG, cornersIMG = cv2.findChessboardCorners(imgGRAY, (7,7), cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FAST_CHECK + cv2.CALIB_CB_NORMALIZE_IMAGE)
+
+    return(retIMG)
