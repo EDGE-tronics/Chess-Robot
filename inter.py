@@ -5,7 +5,13 @@ import os
 import copy
 import threading
 import time
-
+import cv2
+from PIL import Image
+import io
+import sys
+import VisionModule as vm
+# from picamera.array import PiRGBArray
+# from picamera import PiCamera
 
 '''
 styles:
@@ -16,6 +22,7 @@ LightGreen
 Black
 Dark
 '''
+
 
 #   GLOBAL VARIABLES
 
@@ -74,8 +81,16 @@ whiteSquareColor = '#F0D9B5'
 Debug = False
 sequence = []
 state = "stby"
+newGameState = "config"
 gameTime = 60.00
-
+playerSide = 0      # 1-2 (0), 2-3 (1), 3-4 (2), 4-1 (3)
+engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
+route = os.getcwd() + '/'
+homography = []
+prevIMG = []
+detected = True
+selectedCam = 1
+rotMat = vm.np.zeros((2,2))
 
 #   GAME FUNCTIONS
 
@@ -90,6 +105,15 @@ def pcTurn(board,engine):
     if board.is_check():
         window.FindElement(key = "robotMessage").Update("CHECK!")
     updateBoard(window, sequence)
+
+def startEngine():
+    global engine
+    global state
+    engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
+    if userColor:
+        state = "playerTurn"
+    else:
+        state = "pcTurn"
 
 
 def playerTurn(board,squares):
@@ -188,32 +212,186 @@ def updateBoard(window, move):
             elem.Update(button_color=('white', color),
                         image_filename=piece_image, )         
 
-def newGameWindow ():
+def sideConfig(): #gameState: sideConfig
+    global newGameState
+    global state
+    global playerSide
+    global prevIMG
+    global rotMat
+    i = 0
+
+    img = vm.drawQuadrants(prevIMG)
+    imgbytes = cv2.imencode('.png', img)[1].tobytes()
+
+    windowName = "Calibration"
+    initGame = [[sg.Text('Please, choose the white side', justification='center', pad = (25,(5,15)), font='Any 15')],
+                [sg.Image(data=imgbytes, key='boardImg')],
+                [sg.Radio('1-2', group_id='grp', default = True,font='Any 14'), sg.Radio('2-3', group_id='grp',font='Any 14'),sg.Radio('3-4', group_id='grp',font='Any 14'), sg.Radio('4-1', group_id='grp',font='Any 14')],
+                [sg.Text('_'*30)],
+                [sg.Button("Back"), sg.Submit("Play")]]
+    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, location = (100,50), icon='kingb.ico').Layout(initGame) 
+
+    while True:
+        button,value = newGameWindow.Read(timeout=100)
+        
+        if button == "Play":
+            newGameState = "initGame"
+            while value[i] == False and i<4:
+                i+=1
+            playerSide = i
+            if playerSide == 0:
+                theta = 90
+            elif playerSide == 1:
+                theta = 180
+            elif playerSide == 2:
+                theta = -90
+            elif  playerSide == 3:
+                theta = 0
+            rotMat = vm.findRotation(theta)
+            break
+        if button == "Back":
+            newGameState = "ocupiedBoard"
+            break
+        if button in (None, 'Exit'): #MAIN WINDOW
+            state = "stby"
+            newGameState = "config"
+            break   
+
+    newGameWindow.close()
+
+def ocupiedBoard(): #gameState: ocupiedBoard
+    global newGameState
+    global state
+    global selectedCam
+    global homography
+    global prevIMG
+
+    windowName = "Calibration"
+    initGame = [[sg.Text('Please, place the chess pieces and press NEXT', justification='center', pad = (25,(5,15)), font='Any 15')],
+                [sg.Image(filename='', key='boardVideo')],
+                [sg.Text('_'*30)],
+                [sg.Button("Back"), sg.Submit("Next")]]
+    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, location = (100,50), icon='kingb.ico').Layout(initGame)  
+
+    while True:
+        button,value = newGameWindow.Read(timeout = 10)
+
+        if detected:    
+            if selectedCam:
+                ret, frame = cap.read()
+                warpIMG = vm.applyTransformations(frame,homography,rotMat)
+                imgbytes = cv2.imencode('.png', warpIMG)[1].tobytes()  
+                newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
+            else:
+                cam.capture(rawCapture, format="bgr")
+                frame = rawCapture.array
+                rawCapture.truncate(0)      # Clear the stream in preparation for the next image
+                warpIMG = vm.applyTransformations(frame,homography,rotMat)
+                newGameWindow.FindElement('boardVideo').Update(data=frame)
+
+        if button == "Next":
+            newGameState = "sideConfig"
+            prevIMG = warpIMG.copy()
+            break
+        if button == "Back":
+            newGameState = "calibration"
+            break
+        if button in (None, 'Exit'): #MAIN WINDOW
+            state = "stby"
+            newGameState = "config"
+            break   
+
+    newGameWindow.close()
+
+def calibration(): #gameState: calibration
+    global newGameState
+    global state
+    global selectedCam
+    global homography
+    global detected
+    global selectedCam
+
+    cbPattern = cv2.imread(route+'interface_images/cb_pattern.jpg', cv2.IMREAD_GRAYSCALE)
+
+    windowName = "Camera calibration"
+    initGame = [[sg.Text('Please, adjust your camera and remove any chess piece', justification='center', pad = (25,(5,15)), font='Any 15', key = "calibrationBoard")],
+                [sg.Image(filename='', key='boardVideo')],
+                [sg.Text('_'*30)],
+                [sg.Button("Back"), sg.Submit("Next")]]
+    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, location = (100,50), icon='kingb.ico').Layout(initGame) 
+
+    while True:
+        button,value = newGameWindow.Read(timeout = 10)
+
+        if detected:    
+            if selectedCam:
+                ret, frame = cap.read()
+                imgbytes = cv2.imencode('.png', frame)[1].tobytes()  # ditto
+                newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
+            else:
+                cam.capture(rawCapture, format="bgr")
+                frame = rawCapture.array
+                rawCapture.truncate(0)      # Clear the stream in preparation for the next image
+                newGameWindow.FindElement('boardVideo').Update(data=frame)
+            
+            retIMG, homography = vm.findTransformation(frame,cbPattern)
+            if retIMG:
+                newGameWindow.FindElement('calibrationBoard').Update("Camera calibration successful, press NEXT")
+            else:
+                newGameWindow.FindElement('calibrationBoard').Update("Please, adjust your camera and remove any chess piece")
+
+        if button == "Next" and retIMG:
+            newGameState = "ocupiedBoard"
+            break
+        if button == "Back":
+            newGameState = "config"
+            break
+        if button in (None, 'Exit'): #MAIN WINDOW
+            state = "stby"
+            newGameState = "config"
+            break   
+
+    newGameWindow.close() 
+
+def newGameWindow (): #gameState: config
     global userColor
-    global playing
     global gameTime
+    global newGameState
+    global state
+    global detected
+    global cap
+    global selectedCam
+    i = 0
+
     windowName = "Configuration"
     initGame = [[sg.Text('Game Parameters', justification='center', pad = (25,(5,15)), font='Any 15')],
                 [sg.CBox('Play As White', key='userWhite', default = userColor)],
                 [sg.Spin([sz for sz in range(1, 300)], initial_value=1, font='Any 11',key='timeInput'),sg.Text('Time in minutes', pad=(0,0))],
+                [sg.Radio('RPi Cam', group_id='grp'), sg.Radio('USB Cam', group_id='grp', default = True)],
                 [sg.Text('_'*30)],
-                [sg.Button("Back"), sg.Submit("Next")]]
+                [sg.Button("Exit"), sg.Submit("Next")]]
     windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(initGame)
     while True:
         button,value = windowNewGame.Read()
         if button == "Next":
-            playing = True
-            userColor = value["userWhite"]
-            gameTime = float(value["timeInput"]*60)
+            while value[i] == False and i<2:
+                i+=1
+            selectedCam = i
+            cap = initCam(i)
+            if detected:
+                newGameState = "calibration"
+                userColor = value["userWhite"]
+                gameTime = float(value["timeInput"]*60)
             break
         if button in (None, 'Exit'): #MAIN WINDOW
+            state = "stby"
             break   
     windowNewGame.close() 
 
 def quitGameWindow ():
     global playing
     global window
-    windowName = "Configuration"
+    windowName = "Quit Game"
     quitGame = [[sg.Text('Are you sure?',justification='center', size=(30, 1), font='Any 13')], [sg.Submit("Yes",  size=(15, 1)),sg.Submit("No", size=(15, 1))]]
     if playing:
         while True:
@@ -230,7 +408,6 @@ def mainBoardLayout():
     # ------ Menu Definition ------ #      
     menu_def = [['Properties'],      
                 ['Help', 'About...'], ]  
-
 
     # ------ Layout ------ # 
     # sg.SetOptions(margins=(0,0))
@@ -274,6 +451,24 @@ def mainBoardLayout():
 
     return layout
 
+def initCam(selectedCam):
+    global detected
+
+    button, value = window.Read(timeout=10)
+    if selectedCam: #USB CAM
+        cap = cv2.VideoCapture(1)
+        if not cap.isOpened():
+            detected = False  
+            sg.popup_error('USB Video device not found')
+    else: #RPi CAM
+        cap = PiCamera()
+        if not camera:
+            detected = False    
+            sg.popup_error('RPi Video device not found')
+        else:
+            cap.resolution = (640, 480)
+            rawCapture = PiRGBArray(camera, size=(640, 480))
+    return cap
 
 layout = mainBoardLayout()
 window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(layout)
@@ -284,6 +479,9 @@ def main():
     global state
     global playing
     global sequence
+    global newGameState
+    global detected
+
     interfaceMessage = ""
     board = cl.chess.Board()
     squares = []
@@ -291,9 +489,9 @@ def main():
     blackTime = 0
     refTime = time.time()
 
-    while True:
+    while True :
         button, value = window.Read(timeout=100)
-        
+
         if button =="newGame":
             print("entro en new")
             state = "startMenu"
@@ -303,7 +501,6 @@ def main():
             quitGameWindow()
             if not playing:
                 state = "returnPos"
-
 
         #machine messages
         if playing:
@@ -321,18 +518,25 @@ def main():
                 print("GAME OVER")
                 state = "returnPos"
                 window.FindElement(key = "gameMessage").Update("Time Out\n"+ "White Wins")
-       
 
         if state == "stby": #stby
             print(state)
 
         elif state == "startMenu": #Start Menu
             print(state)
-            newGameWindow()
-            if playing:
+            if newGameState == "config":
+                newGameWindow()
+            elif newGameState == "calibration":
+                calibration()
+            elif newGameState == "ocupiedBoard":
+                ocupiedBoard()
+            elif newGameState == "sideConfig":
+                sideConfig()
+            elif newGameState == "initGame":
+                playing = True
+                newGameState = "config"
                 startGame()
                 board = cl.chess.Board()
-                engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
                 window.FindElement(key = "wcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
                 window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
                 window.FindElement(key = "clockButton").Update(image_filename=wclock)
@@ -340,13 +544,11 @@ def main():
                 whiteTime = gameTime
                 blackTime = gameTime
                 refTime = time.time()
-                if userColor:
-                    state = "playerTurn"
-                else:
-                    state = "pcTurn"
-            else:
-                state = "stby"
 
+                processThread = threading.Thread(target=startEngine, daemon=True)
+                processThread.start()
+                state = "stby"
+                
         elif state == "playerTurn": #Player Turn
             print(state)
             if button == "clockButton":
@@ -433,6 +635,8 @@ def main():
             break      
 
     window.close() 
+    sys.exit()
+
 
 
 if __name__ == "__main__":
