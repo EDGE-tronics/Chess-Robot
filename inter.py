@@ -6,12 +6,9 @@ import copy
 import threading
 import time
 import cv2
-from PIL import Image
-import io
 import sys
+import json
 import VisionModule as vm
-# from picamera.array import PiRGBArray
-# from picamera import PiCamera
 
 '''
 styles:
@@ -89,8 +86,15 @@ route = os.getcwd() + '/'
 homography = []
 prevIMG = []
 detected = True
-selectedCam = 1
+selectedCam = 0
+cap = cv2.VideoCapture()
 rotMat = vm.np.zeros((2,2))
+phisicalParams = {"baseradius": 0.0,
+                    "cbFrame": 0.0,
+                    "sqSize": 0.0,
+                    "cbHeight":0.0,
+                    "pieceHeight": 0.0}
+
 
 #   GAME FUNCTIONS
 
@@ -367,7 +371,7 @@ def newGameWindow (): #gameState: config
     initGame = [[sg.Text('Game Parameters', justification='center', pad = (25,(5,15)), font='Any 15')],
                 [sg.CBox('Play As White', key='userWhite', default = userColor)],
                 [sg.Spin([sz for sz in range(1, 300)], initial_value=1, font='Any 11',key='timeInput'),sg.Text('Time in minutes', pad=(0,0))],
-                [sg.Radio('RPi Cam', group_id='grp'), sg.Radio('USB Cam', group_id='grp', default = True)],
+                [sg.Radio('RPi Cam', group_id='grp', default = True), sg.Radio('USB Cam', group_id='grp')],
                 [sg.Text('_'*30)],
                 [sg.Button("Exit"), sg.Submit("Next")]]
     windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(initGame)
@@ -406,8 +410,8 @@ def quitGameWindow ():
 
 def mainBoardLayout():
     # ------ Menu Definition ------ #      
-    menu_def = [['Properties'],      
-                ['Help', 'About...'], ]  
+    menu_def = [['&File',["&Parameters","E&xit"]],      
+                ['&Help', 'About...'], ]  
 
     # ------ Layout ------ # 
     # sg.SetOptions(margins=(0,0))
@@ -446,7 +450,7 @@ def mainBoardLayout():
                         [sg.T("00:00:00",size=(9, 2), font=('courier', 13),key="wcount",pad = ((4,0),0)),sg.T("00:00:00",size=(9, 2), pad = (0,0), font=('courier', 13),key="bcount")],
                         [sg.Button('', image_filename=wclock, key='clockButton', pad = ((25,0),0))]]
 
-    layout = [[sg.Menu(menu_def, tearoff=False)], 
+    layout = [[sg.Menu(menu_def, tearoff=False, key="manubar")], 
                 [sg.Column(board_layout),sg.VerticalSeparator(pad=None),sg.Column(board_controls)]]
 
     return layout
@@ -456,7 +460,7 @@ def initCam(selectedCam):
 
     button, value = window.Read(timeout=10)
     if selectedCam: #USB CAM
-        cap = cv2.VideoCapture(1)
+        cap = cv2.VideoCapture(0)
         if not cap.isOpened():
             detected = False  
             sg.popup_error('USB Video device not found')
@@ -474,6 +478,47 @@ layout = mainBoardLayout()
 window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(layout)
 
 
+def loadParams():
+    global phisicalParams
+
+    if os.path.isfile('params.txt'):
+        json_file = open('params.txt')
+        phisicalParams = json.load(json_file)
+        print(json_file)
+    else:
+        outfile = open('params.txt', 'w')
+        json.dump(phisicalParams, outfile)
+
+def phisicalConfig ():
+    global phisicalParams
+    
+    windowName = "Robot parameters"
+    robotParamLayout= [[sg.Text('Insert the phisical dimentions in milimeters',justification='center', font='Any 14', pad=(10,10))], 
+                       [sg.Spin([sz for sz in range(1, 1000)], initial_value=phisicalParams["baseradius"], font='Any 11'),sg.Text('Base Radius', pad=(0,0))],
+                        [sg.Spin([sz for sz in range(1, 1000)], initial_value=phisicalParams["cbFrame"], font='Any 11'),sg.Text('Chess Board Frame', pad=(0,0))],
+                        [sg.Spin([sz for sz in range(1, 1000)], initial_value=phisicalParams["sqSize"], font='Any 11'),sg.Text('Square Size', pad=(0,0))],
+                        [sg.Spin([sz for sz in range(1, 1000)], initial_value=phisicalParams["cbHeight"], font='Any 11'),sg.Text('Chess Board Height', pad=(0,0))],
+                        [sg.Spin([sz for sz in range(1, 1000)], initial_value=phisicalParams["pieceHeight"], font='Any 11'),sg.Text('Tallest Piece Height', pad=(0,0))],
+                        [sg.Text('_'*37)],
+                        [sg.Submit("Save",  size=(15, 1)),sg.Submit("Close", size=(15, 1))]]
+
+    while True:
+        robotParamWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(robotParamLayout)
+        button,value = robotParamWindow.Read()
+        if button == "Save":
+            phisicalParams = {"baseradius": value[0],
+                    "cbFrame":value[1],
+                    "sqSize": value[2],
+                    "cbHeight":value[3],
+                    "pieceHeight": value[4]}
+            outfile = open('params.txt', 'w')
+            json.dump(phisicalParams, outfile)
+            break
+        if button in (None, 'Close'): #MAIN WINDOW
+            break   
+
+    robotParamWindow.close()   
+
 def main():
     global userColor
     global state
@@ -481,7 +526,9 @@ def main():
     global sequence
     global newGameState
     global detected
+    global phisicalParams
 
+    loadParams()
     interfaceMessage = ""
     board = cl.chess.Board()
     squares = []
@@ -492,10 +539,16 @@ def main():
     while True :
         button, value = window.Read(timeout=100)
 
+        if button in (None, 'Exit') or value["manubar"]=="Exit": #MAIN WINDOW
+            break
+
         if button =="newGame":
-            print("entro en new")
-            state = "startMenu"
-        
+            if phisicalParams["baseradius"] and phisicalParams["cbFrame"] and phisicalParams["sqSize"] and phisicalParams["cbHeight"] and phisicalParams["pieceHeight"]: 
+                print("entro en new")
+                state = "startMenu"
+            else:
+                sg.popup_error('Please configure the robot parameters in the File/Parameters option of menu bar')
+
         if button =="quit":
             print("entro en quit")
             quitGameWindow()
@@ -631,13 +684,15 @@ def main():
                 refTime = time.time()
                 window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(blackTime)))
 
-        if button in (None, 'Exit'): #MAIN WINDOW
-            break      
+        if value["manubar"]=="Parameters":
+            if playing:
+                popup("Please, first quit the game")
+            else:
+                phisicalConfig()
 
     window.close() 
-    sys.exit()
-
-
+    cap.release()
+    
 
 if __name__ == "__main__":
     main()
