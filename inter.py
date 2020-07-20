@@ -6,8 +6,6 @@ import copy
 import threading
 import time
 import cv2
-from PIL import Image
-import io
 import sys
 import VisionModule as vm
 # from picamera.array import PiRGBArray
@@ -456,7 +454,7 @@ def initCam(selectedCam):
 
     button, value = window.Read(timeout=10)
     if selectedCam: #USB CAM
-        cap = cv2.VideoCapture(1)
+        cap = cv2.VideoCapture(0)
         if not cap.isOpened():
             detected = False  
             sg.popup_error('USB Video device not found')
