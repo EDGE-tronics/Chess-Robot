@@ -81,7 +81,6 @@ state = "stby"
 newGameState = "config"
 gameTime = 60.00
 playerSide = 0      # 1-2 (0), 2-3 (1), 3-4 (2), 4-1 (3)
-engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
 route = os.getcwd() + '/'
 homography = []
 prevIMG = []
@@ -119,7 +118,6 @@ def startEngine():
     else:
         state = "pcTurn"
 
-
 def playerTurn(board,squares):
     result = cl.moveAnalysis(squares, board)
     if result:
@@ -140,11 +138,9 @@ def startGame():
     psg_board = copy.deepcopy(initial_board)
     redrawBoard()
 
-
 def quitGame():
     window.FindElement("newGame").Update(disabled=False)
     window.FindElement("quit").Update(disabled=True)
-
 
 #   INTERFACE FUNCTIONS
 
@@ -383,7 +379,7 @@ def newGameWindow (): #gameState: config
             selectedCam = i
             cap = initCam(i)
             if detected:
-                newGameState = "calibration"
+                newGameState = "calibration" 
                 userColor = value["userWhite"]
                 gameTime = float(value["timeInput"]*60)
             break
@@ -442,10 +438,10 @@ def mainBoardLayout():
                         [sg.RButton('Quit', key='quit', size=(15, 2), pad=(0, 0), font=('courier', 16), disabled = True)],
                         [sg.Frame('GAME', frame_layout_game, pad=(0, 10), font='Any 12', title_color='white', key = "frameMessageGame")],
                         [sg.Frame('ROBOT', frame_layout_robot, pad=(0, (0,10)), font='Any 12', title_color='white', key = "frameMessageRobot")],
-                        [sg.InputText('' , size=(12, 1))],
-                        [sg.InputText('' , size=(12, 1))],
-                        [sg.InputText('' , size=(12, 1))],
-                        [sg.InputText('' , size=(12, 1))],
+                        [sg.InputText('' ,key='sq1', size=(12, 1))],
+                        [sg.InputText('' , key='sq2',size=(12, 1))],
+                        [sg.InputText('' ,key='sq3', size=(12, 1))],
+                        [sg.InputText('' , key='sq4',size=(12, 1))],
                         [sg.Button('White Time', size=(7, 2), border_width=0,  font=('courier', 16), button_color=('black', whiteSquareColor), pad=(0, 0), key="wt"),sg.Button('Black Time',  font=('courier', 16), size=(7, 2), border_width=0, button_color=('black', blackSquareColor), pad=((7,0), 0), key="bt")],
                         [sg.T("00:00:00",size=(9, 2), font=('courier', 13),key="wcount",pad = ((4,0),0)),sg.T("00:00:00",size=(9, 2), pad = (0,0), font=('courier', 13),key="bcount")],
                         [sg.Button('', image_filename=wclock, key='clockButton', pad = ((25,0),0))]]
@@ -474,10 +470,6 @@ def initCam(selectedCam):
             rawCapture = PiRGBArray(camera, size=(640, 480))
     return cap
 
-layout = mainBoardLayout()
-window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(layout)
-
-
 def loadParams():
     global phisicalParams
 
@@ -493,12 +485,12 @@ def phisicalConfig ():
     global phisicalParams
     
     windowName = "Robot parameters"
-    robotParamLayout= [[sg.Text('Insert the phisical dimentions in milimeters',justification='center', font='Any 14', pad=(10,10))], 
-                       [sg.Spin([sz for sz in range(1, 1000)], initial_value=phisicalParams["baseradius"], font='Any 11'),sg.Text('Base Radius', pad=(0,0))],
-                        [sg.Spin([sz for sz in range(1, 1000)], initial_value=phisicalParams["cbFrame"], font='Any 11'),sg.Text('Chess Board Frame', pad=(0,0))],
-                        [sg.Spin([sz for sz in range(1, 1000)], initial_value=phisicalParams["sqSize"], font='Any 11'),sg.Text('Square Size', pad=(0,0))],
-                        [sg.Spin([sz for sz in range(1, 1000)], initial_value=phisicalParams["cbHeight"], font='Any 11'),sg.Text('Chess Board Height', pad=(0,0))],
-                        [sg.Spin([sz for sz in range(1, 1000)], initial_value=phisicalParams["pieceHeight"], font='Any 11'),sg.Text('Tallest Piece Height', pad=(0,0))],
+    robotParamLayout= [[sg.Text('Insert the phisical dimentions in inches',justification='center', font='Any 14', pad=(10,10))], 
+                       [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=phisicalParams["baseradius"], font='Any 11'),sg.Text('Base Radius', pad=(0,0))],
+                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=phisicalParams["cbFrame"], font='Any 11'),sg.Text('Chess Board Frame', pad=(0,0))],
+                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=phisicalParams["sqSize"], font='Any 11'),sg.Text('Square Size', pad=(0,0))],
+                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=phisicalParams["cbHeight"], font='Any 11'),sg.Text('Chess Board Height', pad=(0,0))],
+                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=phisicalParams["pieceHeight"], font='Any 11'),sg.Text('Tallest Piece Height', pad=(0,0))],
                         [sg.Text('_'*37)],
                         [sg.Submit("Save",  size=(15, 1)),sg.Submit("Close", size=(15, 1))]]
 
@@ -518,6 +510,9 @@ def phisicalConfig ():
             break   
 
     robotParamWindow.close()   
+
+layout = mainBoardLayout()
+window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(layout)
 
 def main():
     global userColor
@@ -541,6 +536,12 @@ def main():
 
         if button in (None, 'Exit') or value["manubar"]=="Exit": #MAIN WINDOW
             break
+
+        if value["manubar"]=="Parameters":
+            if playing:
+                popup("Please, first quit the game")
+            else:
+                phisicalConfig()
 
         if button =="newGame":
             if phisicalParams["baseradius"] and phisicalParams["cbFrame"] and phisicalParams["sqSize"] and phisicalParams["cbHeight"] and phisicalParams["pieceHeight"]: 
@@ -611,12 +612,12 @@ def main():
         elif state == "moveDetection": #Computer vision movement detection and move Validation
             print(state)
             print(button,value)
-            squares.append(value[1])
-            squares.append(value[2])
-            if value[3]:
-                squares.append(value[3])
-            if value[4]:
-                squares.append(value[4])
+            squares.append(value["sq1"])
+            squares.append(value["sq2"])
+            if value["sq3"]:
+                squares.append(value["sq3"])
+            if value["sq4"]:
+                squares.append(value["sq4"])
             print(squares)
 
             if playerTurn(board, squares):
@@ -684,15 +685,9 @@ def main():
                 refTime = time.time()
                 window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(blackTime)))
 
-        if value["manubar"]=="Parameters":
-            if playing:
-                popup("Please, first quit the game")
-            else:
-                phisicalConfig()
-
     window.close() 
     cap.release()
-    
 
 if __name__ == "__main__":
     main()
+
