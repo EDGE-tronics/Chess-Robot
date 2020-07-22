@@ -16,7 +16,7 @@ try:
     from picamera import PiCamera
 except ImportError:
     pass
-    
+
 '''
 styles:
 
@@ -91,6 +91,7 @@ playerSide = 0      # 1-2 (0), 2-3 (1), 3-4 (2), 4-1 (3)
 route = os.getcwd() + '/'
 homography = []
 prevIMG = []
+usbPort = ""
 detected = True
 selectedCam = 0
 cap = cv2.VideoCapture()
@@ -101,6 +102,15 @@ phisicalParams = {"baseradius": 0.00,
                     "cbHeight":0.00,
                     "pieceHeight": 0.00}
 
+
+
+def usbPortSeletion():
+    global usbPort
+
+    if platform.system() == 'Windows':
+        usbPort = "/dev/ttyUSB0"
+    elif platform.system() == 'Linux':
+        usbPort = "COM3"
 
 #   GAME FUNCTIONS
 
@@ -530,6 +540,7 @@ def main():
     global detected
     global phisicalParams
 
+    usbPortSeletion()
     loadParams()
     interfaceMessage = ""
     board = cl.chess.Board()
