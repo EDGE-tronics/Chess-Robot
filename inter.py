@@ -9,7 +9,14 @@ import cv2
 import sys
 import json
 import VisionModule as vm
+import platform
 
+try:
+    from picamera.array import PiRGBArray
+    from picamera import PiCamera
+except ImportError:
+    pass
+    
 '''
 styles:
 
@@ -88,11 +95,11 @@ detected = True
 selectedCam = 0
 cap = cv2.VideoCapture()
 rotMat = vm.np.zeros((2,2))
-phisicalParams = {"baseradius": 0.0,
-                    "cbFrame": 0.0,
-                    "sqSize": 0.0,
-                    "cbHeight":0.0,
-                    "pieceHeight": 0.0}
+phisicalParams = {"baseradius": 0.00,
+                    "cbFrame": 0.00,
+                    "sqSize": 0.00,
+                    "cbHeight":0.00,
+                    "pieceHeight": 0.00}
 
 
 #   GAME FUNCTIONS
@@ -686,7 +693,7 @@ def main():
                 window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(blackTime)))
 
     window.close() 
-    cap.release()
+    
 
 if __name__ == "__main__":
     main()
