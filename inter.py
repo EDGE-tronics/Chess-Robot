@@ -77,7 +77,7 @@ wclock = os.getcwd() + '/interface_images/wclock.png'
 bclock = os.getcwd() + '/interface_images/bclock.png'
 
 graveyard = 'k0'
-userColor = True
+playerColor = True
 playing =  False
 blackSquareColor = '#B58863'
 whiteSquareColor = '#F0D9B5'
@@ -90,7 +90,7 @@ playerSide = 0      # 1-2 (0), 2-3 (1), 3-4 (2), 4-1 (3)
 route = os.getcwd() + '/'
 homography = []
 prevIMG = []
-usbPort = ""
+serial = ""
 chessRoute = ""
 detected = True
 selectedCam = 0
@@ -99,36 +99,31 @@ rotMat = vm.np.zeros((2,2))
 phisicalParams = {"baseradius": 0.00,
                     "cbFrame": 0.00,
                     "sqSize": 0.00,
-                    "cbHeight":0.00,
+                    "cbHeight": 0.00,
                     "pieceHeight": 0.00}
 
-def usbPortSeletion():
-    global usbPort
-
-    if platform.system() == 'Windows':
-        usbPort = "/dev/ttyUSB0"
-    elif platform.system() == 'Linux':
-        usbPort = "COM3"
-
-'''
-def routeChessSeletion():
+def systemConfig():
+    global serial
     global chessRoute
 
     if platform.system() == 'Windows':
-        chessRoute = "stockfishX64.exe"
+        serial = "COM3"
+        chessRoute = "games/stockfishX64.exe"
     elif platform.system() == 'Linux':
+        serial = "/dev/ttyUSB0"
         chessRoute = "usr/games/stockfish"
 
-'''
 #   GAME FUNCTIONS
 
 def pcTurn(board,engine):
     global sequence
     global state
+    setup = ()
     pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
     sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
     window.FindElement(key = "gameMessage").Update(sequence["type"])
     board.push(pcMove.move)
+    executeMove(sequence["seq"])
     state = "updatePcMove"
     if board.is_check():
         window.FindElement(key = "robotMessage").Update("CHECK!")
@@ -137,8 +132,8 @@ def pcTurn(board,engine):
 def startEngine():
     global engine
     global state
-    engine = cl.chess.engine.SimpleEngine.popen_uci("/usr/games/stockfish")
-    if userColor:
+    engine = cl.chess.engine.SimpleEngine.popen_uci(chessRoute)
+    if playerColor:
         state = "playerTurn"
     else:
         state = "pcTurn"
@@ -180,8 +175,8 @@ def renderSquare(image, key, location):
 
 def redrawBoard():
     columns = 'abcdefgh'
-    global userColor
-    if userColor:
+    global playerColor
+    if playerColor:
         for i in range(8):
             window.FindElement(key = str(8-i)+"r").Update("   "+str(8-i))
             window.FindElement(key = str(8-i)+"l").Update(str(8-i)+"   ")
@@ -207,7 +202,7 @@ def redrawBoard():
                             image_filename=piece_image, )
 
 def updateBoard(window, move):
-    global userColor
+    global playerColor
     for cont in range(0,len(move["seq"]),4):
         squareCleared = move["seq"][cont:cont+2]
         squareOcuped = move["seq"][cont+2:cont+4]
@@ -218,7 +213,7 @@ def updateBoard(window, move):
         piece = psg_board[x][y]
         psg_board[x][y] = BLANK
         color = blackSquareColor if (x + y) % 2 else whiteSquareColor
-        if userColor:
+        if playerColor:
             elem = window.FindElement(key=(x, y))
         else:
             elem = window.FindElement(key=(7-x, 7-y))
@@ -230,7 +225,7 @@ def updateBoard(window, move):
             x = 7 - cl.chess.square_rank(cl.chess.SQUARE_NAMES.index(squareOcuped))
             psg_board[x][y] = piece
             color = blackSquareColor if (x + y) % 2 else whiteSquareColor
-            if userColor:
+            if playerColor:
                 elem = window.FindElement(key=(x, y))
             else:
                 elem = window.FindElement(key=(7-x, 7-y))    
@@ -302,34 +297,25 @@ def ocupiedBoard(): #gameState: ocupiedBoard
         button,value = newGameWindow.Read(timeout = 10)
 
         if detected:    
-            if selectedCam:
-                ret, frame = cap.read()
-                warpIMG = vm.applyTransformations(frame,homography,rotMat)
-                imgbytes = cv2.imencode('.png', warpIMG)[1].tobytes()  
-                newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
-            else:
-                cap.capture(rawCapture, format="bgr")
-                frame = rawCapture.array
-                rawCapture.truncate(0)      # Clear the stream in preparation for the next image
-                warpIMG = vm.applyTransformations(frame,homography,rotMat)
-                imgbytes = cv2.imencode('.png', warpIMG)[1].tobytes()
-                newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
+            frame = takePIC()
+            prevIMG = vm.applyTransformations(frame,homography,rotMat)
+            imgbytes = cv2.imencode('.png', prevIMG)[1].tobytes()
+            newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
 
         if button == "Next":
             newGameState = "sideConfig"
-            prevIMG = warpIMG.copy()
             break
         if button == "Back":
             newGameState = "calibration"
             break
-        if button in (None, 'Exit'): #MAIN WINDOW
+        if button in (None, 'Exit'): # MAIN WINDOW
             state = "stby"
             newGameState = "config"
             break   
 
     newGameWindow.close()
 
-def calibration(): #gameState: calibration
+def calibration(): # gameState: calibration
     global newGameState
     global state
     global selectedCam
@@ -350,16 +336,9 @@ def calibration(): #gameState: calibration
         button,value = newGameWindow.Read(timeout = 10)
 
         if detected:    
-            if selectedCam:
-                ret, frame = cap.read()
-                imgbytes = cv2.imencode('.png', frame)[1].tobytes()  # ditto
-                newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
-            else:
-                cap.capture(rawCapture, format="bgr")
-                frame = rawCapture.array
-                imgbytes = cv2.imencode('.png', frame)[1].tobytes()  # ditto
-                newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
-                rawCapture.truncate(0)      # Clear the stream in preparation for the next image
+            frame = takePIC()
+            imgbytes = cv2.imencode('.png', frame)[1].tobytes()  
+            newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
             
             retIMG, homography = vm.findTransformation(frame,cbPattern)
             if retIMG:
@@ -380,8 +359,20 @@ def calibration(): #gameState: calibration
 
     newGameWindow.close() 
 
+def takePIC():  
+    global selectedCam
+
+    if selectedCam:
+        ret, frame = cap.read() # USB CAM
+    else:
+        cap.capture(rawCapture, format="bgr") # RPi CAM
+        frame = rawCapture.array
+        rawCapture.truncate(0)      # Clear the stream in preparation for the next image
+    
+    return frame
+
 def newGameWindow (): #gameState: config
-    global userColor
+    global playerColor
     global gameTime
     global newGameState
     global state
@@ -392,7 +383,7 @@ def newGameWindow (): #gameState: config
 
     windowName = "Configuration"
     initGame = [[sg.Text('Game Parameters', justification='center', pad = (25,(5,15)), font='Any 15')],
-                [sg.CBox('Play As White', key='userWhite', default = userColor)],
+                [sg.CBox('Play As White', key='userWhite', default = playerColor)],
                 [sg.Spin([sz for sz in range(1, 300)], initial_value=1, font='Any 11',key='timeInput'),sg.Text('Time in minutes', pad=(0,0))],
                 [sg.Radio('RPi Cam', group_id='grp', default = True), sg.Radio('USB Cam', group_id='grp')],
                 [sg.Text('_'*30)],
@@ -408,7 +399,7 @@ def newGameWindow (): #gameState: config
             if detected:
                 #newGameState = "calibration" 
                 newGameState = "initGame"
-                userColor = value["userWhite"]
+                playerColor = value["userWhite"]
                 gameTime = float(value["timeInput"]*60)
             break
         if button in (None, 'Exit'): #MAIN WINDOW
@@ -466,10 +457,6 @@ def mainBoardLayout():
                         [sg.RButton('Quit', key='quit', size=(15, 2), pad=(0, 0), font=('courier', 16), disabled = True)],
                         [sg.Frame('GAME', frame_layout_game, pad=(0, 10), font='Any 12', title_color='white', key = "frameMessageGame")],
                         [sg.Frame('ROBOT', frame_layout_robot, pad=(0, (0,10)), font='Any 12', title_color='white', key = "frameMessageRobot")],
-                        [sg.InputText('' ,key='sq1', size=(12, 1))],
-                        [sg.InputText('' , key='sq2',size=(12, 1))],
-                        [sg.InputText('' ,key='sq3', size=(12, 1))],
-                        [sg.InputText('' , key='sq4',size=(12, 1))],
                         [sg.Button('White Time', size=(7, 2), border_width=0,  font=('courier', 16), button_color=('black', whiteSquareColor), pad=(0, 0), key="wt"),sg.Button('Black Time',  font=('courier', 16), size=(7, 2), border_width=0, button_color=('black', blackSquareColor), pad=((7,0), 0), key="bt")],
                         [sg.T("00:00:00",size=(9, 2), font=('courier', 13),key="wcount",pad = ((4,0),0)),sg.T("00:00:00",size=(9, 2), pad = (0,0), font=('courier', 13),key="bcount")],
                         [sg.Button('', image_filename=wclock, key='clockButton', pad = ((25,0),0))]]
@@ -544,7 +531,7 @@ layout = mainBoardLayout()
 window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(layout)
 
 def main():
-    global userColor
+    global playerColor
     global state
     global playing
     global sequence
@@ -552,7 +539,7 @@ def main():
     global detected
     global phisicalParams
 
-    usbPortSeletion()
+    systemConfig()
     loadParams()
     interfaceMessage = ""
     board = cl.chess.Board()
@@ -624,7 +611,7 @@ def main():
                 window.FindElement(key = "wcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
                 window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
                 window.FindElement(key = "clockButton").Update(image_filename=wclock)
-                window.FindElement(key = "gameMessage").Update("Good Luck!")
+                window.FindElement(key = "robotMessage").Update("Good Luck!")
                 whiteTime = gameTime
                 blackTime = gameTime
                 refTime = time.time()
@@ -636,46 +623,35 @@ def main():
         elif state == "playerTurn": #Player Turn
             print(state)
             if button == "clockButton":
-                print("entro en send")
-                state = "moveDetection"
-
-        elif state == "moveDetection": #Computer vision movement detection and move Validation
-            print(state)
-            print(button,value)
-            squares.append(value["sq1"])
-            squares.append(value["sq2"])
-            if value["sq3"]:
-                squares.append(value["sq3"])
-            if value["sq4"]:
-                squares.append(value["sq4"])
-            print(squares)
-
-            if playerTurn(board, squares):
-                state = "pcTurn"
-            else:
-                print("INVALID MOVE")
-                state = "playerTurn"
-
-            print(board)
-            squares.clear()
+                currentIMG = takePIC()
+                curIMG = vm.applyTransformations(currentIMG,homography,rotMat)
+                squares = findMoves(prevIMG, curIMG)
+                if playerTurn(board, squares):
+                    state = "pcTurn"
+                else:
+                    window.FindElement(key = "gameMessage").Update("Invalid move!")
+                    state = "playerTurn"
         
-        elif state == "pcTurn": #PC turn
+        elif state == "pcTurn": # PC turn
             print(state)
             
             if board.turn:
                 window.FindElement(key = "clockButton").Update(image_filename=wclock)
             else:
                 window.FindElement(key = "clockButton").Update(image_filename=bclock)
+                
             processThread = threading.Thread(target=pcTurn, args=(board,engine,), daemon=True)
             processThread.start()
-            state = "stby" #need wait for pc movment, the deamon change the state
+            state = "stby" # Wait for the PC move, thread changes the state
 
-        elif state == "updatePcMove": #PC turn, make the robot movement in this state
+        elif state == "updatePcMove": # PC turn, make the robot move in this state
             print(state)
             state = "robotMove"
 
-        elif state == "robotMove": #Move of piece by robot
+        elif state == "robotMove": # Move of robot
             print(state)
+            previousIMG = takePIC()
+            prevIMG = vm.applyTransformations(previousIMG,homography,rotMat)
             state = "playerTurn"
             window.FindElement(key = "robotMessage").Update("---")
             if board.turn:
@@ -683,7 +659,7 @@ def main():
             else:
                 window.FindElement(key = "clockButton").Update(image_filename=bclock)
 
-        elif state == "returnPos": #Return robotic Arm to zero position
+        elif state == "returnPos": # Return Arm to rest position
             print(state)
             state = "showGameResult"
 
