@@ -14,7 +14,7 @@ import platform
 try:
     from picamera.array import PiRGBArray
     from picamera import PiCamera
-except ImportError:
+except:
     pass
 
 '''
@@ -92,6 +92,7 @@ route = os.getcwd() + '/'
 homography = []
 prevIMG = []
 usbPort = ""
+chessRoute = ""
 detected = True
 selectedCam = 0
 cap = cv2.VideoCapture()
@@ -112,6 +113,16 @@ def usbPortSeletion():
     elif platform.system() == 'Linux':
         usbPort = "COM3"
 
+'''
+def routeChessSeletion():
+    global chessRoute
+
+    if platform.system() == 'Windows':
+        chessRoute = "stockfishX64.exe"
+    elif platform.system() == 'Linux':
+        chessRoute = "usr/games/stockfish"
+
+'''
 #   GAME FUNCTIONS
 
 def pcTurn(board,engine):
@@ -396,7 +407,8 @@ def newGameWindow (): #gameState: config
             selectedCam = i
             cap = initCam(i)
             if detected:
-                newGameState = "calibration" 
+                #newGameState = "calibration" 
+                newGameState = "initGame"
                 userColor = value["userWhite"]
                 gameTime = float(value["timeInput"]*60)
             break
