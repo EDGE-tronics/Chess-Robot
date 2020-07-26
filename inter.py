@@ -16,7 +16,7 @@ try:
     from picamera import PiCamera
 except:
     pass
-
+    
 '''
 styles:
 
@@ -26,7 +26,6 @@ LightGreen
 Black
 Dark
 '''
-
 
 #   GLOBAL VARIABLES
 
@@ -103,8 +102,6 @@ phisicalParams = {"baseradius": 0.00,
                     "cbHeight":0.00,
                     "pieceHeight": 0.00}
 
-
-
 def usbPortSeletion():
     global usbPort
 
@@ -140,7 +137,7 @@ def pcTurn(board,engine):
 def startEngine():
     global engine
     global state
-    engine = cl.chess.engine.SimpleEngine.popen_uci("stockfishX64.exe")
+    engine = cl.chess.engine.SimpleEngine.popen_uci("/usr/games/stockfish")
     if userColor:
         state = "playerTurn"
     else:
@@ -311,11 +308,12 @@ def ocupiedBoard(): #gameState: ocupiedBoard
                 imgbytes = cv2.imencode('.png', warpIMG)[1].tobytes()  
                 newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
             else:
-                cam.capture(rawCapture, format="bgr")
+                cap.capture(rawCapture, format="bgr")
                 frame = rawCapture.array
                 rawCapture.truncate(0)      # Clear the stream in preparation for the next image
                 warpIMG = vm.applyTransformations(frame,homography,rotMat)
-                newGameWindow.FindElement('boardVideo').Update(data=frame)
+                imgbytes = cv2.imencode('.png', warpIMG)[1].tobytes()
+                newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
 
         if button == "Next":
             newGameState = "sideConfig"
@@ -357,10 +355,11 @@ def calibration(): #gameState: calibration
                 imgbytes = cv2.imencode('.png', frame)[1].tobytes()  # ditto
                 newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
             else:
-                cam.capture(rawCapture, format="bgr")
+                cap.capture(rawCapture, format="bgr")
                 frame = rawCapture.array
+                imgbytes = cv2.imencode('.png', frame)[1].tobytes()  # ditto
+                newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
                 rawCapture.truncate(0)      # Clear the stream in preparation for the next image
-                newGameWindow.FindElement('boardVideo').Update(data=frame)
             
             retIMG, homography = vm.findTransformation(frame,cbPattern)
             if retIMG:
@@ -482,6 +481,7 @@ def mainBoardLayout():
 
 def initCam(selectedCam):
     global detected
+    global rawCapture
 
     button, value = window.Read(timeout=10)
     if selectedCam: #USB CAM
@@ -491,12 +491,12 @@ def initCam(selectedCam):
             sg.popup_error('USB Video device not found')
     else: #RPi CAM
         cap = PiCamera()
-        if not camera:
+        if not cap:
             detected = False    
             sg.popup_error('RPi Video device not found')
         else:
             cap.resolution = (640, 480)
-            rawCapture = PiRGBArray(camera, size=(640, 480))
+            rawCapture = PiRGBArray(cap, size=(640, 480))
     return cap
 
 def loadParams():
