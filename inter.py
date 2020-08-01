@@ -10,6 +10,7 @@ import sys
 import json
 import VisionModule as vm
 import platform
+import ArmControl
 
 try:
     from picamera.array import PiRGBArray
@@ -118,13 +119,12 @@ def systemConfig():
 def pcTurn(board,engine):
     global sequence
     global state
-    setup = ()
     pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
     sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
     window.FindElement(key = "gameMessage").Update(sequence["type"])
     board.push(pcMove.move)
     executeMove(sequence["seq"])
-    state = "updatePcMove"
+    state = "robotMove"
     if board.is_check():
         window.FindElement(key = "robotMessage").Update("CHECK!")
     updateBoard(window, sequence)
@@ -538,6 +538,7 @@ def main():
     global newGameState
     global detected
     global phisicalParams
+    global moveState
 
     systemConfig()
     loadParams()
@@ -643,10 +644,6 @@ def main():
             processThread = threading.Thread(target=pcTurn, args=(board,engine,), daemon=True)
             processThread.start()
             state = "stby" # Wait for the PC move, thread changes the state
-
-        elif state == "updatePcMove": # PC turn, make the robot move in this state
-            print(state)
-            state = "robotMove"
 
         elif state == "robotMove": # Move of robot
             print(state)
