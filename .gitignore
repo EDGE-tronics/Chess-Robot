@@ -1,4 +1,4 @@
 test_images/
 env/
 __pycache__/
-*.txt
+params.txt
