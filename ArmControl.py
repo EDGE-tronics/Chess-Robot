@@ -25,7 +25,6 @@ allMotors = lss.LSS(254)
 
 allMotors.setAngularStiffness(0)
 allMotors.setAngularHoldingStiffness(0)
-allMotors.setColorLED(lssc.LSS_LED_Cyan)
 allMotors.setMaxSpeed(70)
 wrist.setMaxSpeed(120)
 
@@ -182,7 +181,7 @@ def executeMove(move, params, color):
     global serial
     moveState = False
     playerColor = color
-
+    allMotors.setColorLED(lssc.LSS_LED_Cyan)
     z = params["cbHeight"] + params["pieceHeight"]
     angles_rest = (0,-1100,450,1100,0)
     gripper = lss.LSS(5)
