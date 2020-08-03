@@ -1,5 +1,4 @@
 test_images/
 env/
-interface.py
 __pycache__/
 *.txt
