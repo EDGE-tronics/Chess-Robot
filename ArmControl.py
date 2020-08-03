@@ -7,16 +7,39 @@ import VisionModule as vm
 import lss
 import lss_const as lssc
 import pathlib
+import platform
+
+playerColor = 1
+if platform.system() == 'Windows':
+    port = "COM3"
+elif platform.system() == 'Linux':
+    port = "/dev/ttyUSB0"
+    
+lss.initBus(port,lssc.LSS_DefaultBaud) 
+base = lss.LSS(1)
+shoulder = lss.LSS(2)
+elbow = lss.LSS(3)
+wrist = lss.LSS(4)
+gripper = lss.LSS(5)
+allMotors = lss.LSS(254)
+
+allMotors.setAngularStiffness(0)
+allMotors.setAngularHoldingStiffness(0)
+allMotors.setColorLED(lssc.LSS_LED_Cyan)
+allMotors.setMaxSpeed(70)
+wrist.setMaxSpeed(120)
+
 
 CST_ANGLE_MIN = -90
 CST_ANGLE_MAX = 90
 
+
 def checkConstraints(value, min, max):
-	if (value < min):
-		value = min
-	if (value > max):
-		value = max
-	return (value)
+    if (value < min):
+        value = min
+    if (value > max):
+        value = max
+    return (value)
 
 # Desired positions in x, y, z, gripper aperture
 def LSS_IK(targetXYZG):
@@ -141,12 +164,12 @@ def CBtoXY(targetCBsq, params):
         x = 6 * params["sqSize"]
         y = 6 * params["sqSize"]
     else:
-        if playerColor:         # White
-            sqletter = wletterWeight[ord(targetCBsq[0]) - 97]
-            sqNumber = int(targetCBsq[1])
-        else:                   # Black
+        if playerColor:         # White -> Robot color = Black
             sqletter = bletterWeight[ord(targetCBsq[0]) - 97]
             sqNumber = bnumberWeight[int(targetCBsq[1]) - 1]
+        else:                   # Black
+            sqletter = wletterWeight[ord(targetCBsq[0]) - 97]
+            sqNumber = int(targetCBsq[1])
 
         offset = params["baseradius"] + params["cbFrame"]
         x = offset + params["sqSize"] * sqNumber - 3*params["sqSize"]/4
@@ -154,10 +177,11 @@ def CBtoXY(targetCBsq, params):
 
     return(x,y)
 
-def executeMove(move, params):
+def executeMove(move, params, color):
     global playerColor
     global serial
     moveState = False
+    playerColor = color
 
     z = params["cbHeight"] + params["pieceHeight"]
     angles_rest = (0,-1100,450,1100,0)
@@ -255,42 +279,11 @@ def speak(text):
 
 def winLED(allMotors):
     for i in range (0, 4):
-	    for j in range (1, 8):                  # Loop through each of the 8 LED color (black = 0, red = 1, ..., white = 7)
-		    allMotors.setColorLED(j)            # Set the color (session) of the LSS
-		    time.sleep(0.3)                     # Wait 0.3 seconds per color change
+        for j in range (1, 8):                  # Loop through each of the 8 LED color (black = 0, red = 1, ..., white = 7)
+            allMotors.setColorLED(j)            # Set the color (session) of the LSS
+            time.sleep(0.3)                     # Wait 0.3 seconds per color change
     allMotors.setColorLED(lssc.LSS_LED_Black)
 
 #############################################################################################################################
 
-params = {  "baseradius": 2.17,
-            "cbFrame": 0.59,
-            "sqSize": 1.09,
-            "cbHeight": 0.79,
-            "pieceHeight": 1.97 }
-playerColor = 1                                         # White
-
-# serial = ("/dev/ttyUSB0",lssc.LSS_DefaultBaud)		# For Linux/Unix platforms		
-serial = ("COM3",lssc.LSS_DefaultBaud)                  # For windows platforms
-lss.initBus(serial[0], serial[1])
-homography = ""
-
-base = lss.LSS(1)
-shoulder = lss.LSS(2)
-elbow = lss.LSS(3)
-wrist = lss.LSS(4)
-gripper = lss.LSS(5)
-allMotors = lss.LSS(254)
-
-allMotors.setAngularStiffness(0)
-allMotors.setAngularHoldingStiffness(0)
-allMotors.setColorLED(lssc.LSS_LED_Cyan)
-allMotors.setMaxSpeed(70)
-wrist.setMaxSpeed(120)
-
-def main():
-    
-    move = "h1a1"
-    executeMove(move, params)
-
-if __name__ == "__main__":
-    main()
+   

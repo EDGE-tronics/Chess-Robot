@@ -10,7 +10,7 @@ import sys
 import json
 import VisionModule as vm
 import platform
-import ArmControl
+import ArmControl as ac
 
 try:
     from picamera.array import PiRGBArray
@@ -91,7 +91,6 @@ playerSide = 0      # 1-2 (0), 2-3 (1), 3-4 (2), 4-1 (3)
 route = os.getcwd() + '/'
 homography = []
 prevIMG = []
-serial = ""
 chessRoute = ""
 detected = True
 selectedCam = 0
@@ -104,15 +103,12 @@ phisicalParams = {"baseradius": 0.00,
                     "pieceHeight": 0.00}
 
 def systemConfig():
-    global serial
     global chessRoute
 
     if platform.system() == 'Windows':
-        serial = "COM3"
         chessRoute = "games/stockfishX64.exe"
     elif platform.system() == 'Linux':
-        serial = "/dev/ttyUSB0"
-        chessRoute = "usr/games/stockfish"
+        chessRoute = "/usr/games/stockfish"
 
 #   GAME FUNCTIONS
 
@@ -123,7 +119,7 @@ def pcTurn(board,engine):
     sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
     window.FindElement(key = "gameMessage").Update(sequence["type"])
     board.push(pcMove.move)
-    executeMove(sequence["seq"])
+    ac.executeMove(sequence["seq"],phisicalParams, playerColor)
     state = "robotMove"
     if board.is_check():
         window.FindElement(key = "robotMessage").Update("CHECK!")
@@ -132,6 +128,7 @@ def pcTurn(board,engine):
 def startEngine():
     global engine
     global state
+    print ("startEngine")
     engine = cl.chess.engine.SimpleEngine.popen_uci(chessRoute)
     if playerColor:
         state = "playerTurn"
@@ -397,8 +394,8 @@ def newGameWindow (): #gameState: config
             selectedCam = i
             cap = initCam(i)
             if detected:
-                #newGameState = "calibration" 
-                newGameState = "initGame"
+                newGameState = "calibration" 
+                #newGameState = "initGame"
                 playerColor = value["userWhite"]
                 gameTime = float(value["timeInput"]*60)
             break
@@ -539,6 +536,7 @@ def main():
     global detected
     global phisicalParams
     global moveState
+    global prevIMG
 
     systemConfig()
     loadParams()
@@ -622,11 +620,12 @@ def main():
                 state = "stby"
                 
         elif state == "playerTurn": #Player Turn
-            print(state)
+#             print(state)
             if button == "clockButton":
                 currentIMG = takePIC()
                 curIMG = vm.applyTransformations(currentIMG,homography,rotMat)
-                squares = findMoves(prevIMG, curIMG)
+                squares = vm.findMoves(prevIMG, curIMG)
+                print(squares)
                 if playerTurn(board, squares):
                     state = "pcTurn"
                 else:
