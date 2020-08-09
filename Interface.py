@@ -97,7 +97,6 @@ prevIMG = []
 chessRoute = ""
 detected = True
 selectedCam = 0
-command = ""
 cap = cv2.VideoCapture()
 rotMat = vm.np.zeros((2,2))
 phisicalParams = {"baseradius": 0.00,
@@ -119,34 +118,41 @@ def systemConfig():
 def pcTurn(board,engine):
     global sequence
     global state
-    global command
+    command = ""
     pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
     sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
     window.FindElement(key = "gameMessage").Update(sequence["type"])
     board.push(pcMove.move)
-    speakThread = threading.Thread(target=speak, daemon=True)
+    #speakThread = threading.Thread(target=speak, args=[command], daemon=True)
     if board.is_checkmate():
         window.FindElement(key = "robotMessage").Update("CHECKMATE!")
         command = "checkmate"
+        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
     elif board.is_check():
         window.FindElement(key = "robotMessage").Update("CHECK!")
         command = "check"
+        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
     elif sequence["type"] == "White Queen Side Castling" or sequence["type"] == "Black Queen Side Castling":
         command = "qcastling"
+        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
     elif sequence["type"] == "White King Side Castling" or sequence["type"] == "Black King Side Castling":
         command = "kcastling"
+        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
     elif sequence["type"] == "Capture":
         command = "capture"
+        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
     elif sequence["type"] == "Passant":
         command = "passant"
+        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
     elif sequence["type"] == "Promotion":
         command = "promotion"
+        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
 
     ac.executeMove(sequence["seq"],phisicalParams, playerColor)
@@ -263,6 +269,8 @@ def sideConfig(): #gameState: sideConfig
     global playerSide
     global prevIMG
     global rotMat
+    global playerColor
+    
     i = 0
 
     img = vm.drawQuadrants(prevIMG)
@@ -562,7 +570,7 @@ def phisicalConfig ():
 layout = mainBoardLayout()
 window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(layout)
 
-def speak():
+def speak(command):
     pygame.mixer.init()
     filePath = str(pathlib.Path().absolute())+"/audio/"
     if command == "capture":
@@ -595,7 +603,7 @@ def main():
     global phisicalParams
     global moveState
     global prevIMG
-    global command
+    global rotMat
 
     systemConfig()
     loadParams()
