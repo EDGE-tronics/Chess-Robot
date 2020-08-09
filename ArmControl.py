@@ -6,10 +6,9 @@ from gtts import gTTS
 import VisionModule as vm
 import lss
 import lss_const as lssc
-import pathlib
 import platform
+#from Interface import speak
 
-playerColor = 1
 if platform.system() == 'Windows':
     port = "COM3"
 elif platform.system() == 'Linux':
@@ -25,13 +24,11 @@ allMotors = lss.LSS(254)
 
 allMotors.setAngularStiffness(0)
 allMotors.setAngularHoldingStiffness(0)
-allMotors.setMaxSpeed(70)
+allMotors.setMaxSpeed(60)
 wrist.setMaxSpeed(120)
-
 
 CST_ANGLE_MIN = -90
 CST_ANGLE_MAX = 90
-
 
 def checkConstraints(value, min, max):
     if (value < min):
@@ -100,12 +97,12 @@ def LSS_IK(targetXYZG):
 
 def LSSA_moveMotors(angles_BSEWG):
 
-    # If the servos detect a current of 500mA(HS)/1A(HT) or higher before reaching the requested positions they will halt and hold
-    wrist.moveCH(angles_BSEWG[3], 500)
+    # If the servos detect a current of 600mA(wrist and gripper)/1A(base, shoulder and elbow) or higher before reaching the requested positions they will halt and hold
+    wrist.moveCH(angles_BSEWG[3], 600)
     shoulder.moveCH(angles_BSEWG[1], 1000)
     elbow.moveCH(angles_BSEWG[2], 1000)
     base.moveCH(angles_BSEWG[0], 1000)
-    gripper.moveCH(angles_BSEWG[4], 500)
+    gripper.moveCH(angles_BSEWG[4], 600)
 
     arrived = False
     issue = False
@@ -116,11 +113,9 @@ def LSSA_moveMotors(angles_BSEWG):
         sPos = shoulder.getPosition()
         ePos = elbow.getPosition()
         bPos = base.getPosition()
-        print("- Get position")
         # If the position is None
         if (wPos is None or sPos is None or ePos is None or bPos is None):
             arrived = False
-            print("- Position = None")
         # If it hasn't reached the requested position return arrived = False
         elif ((int(wPos)-angles_BSEWG[3])>20 or (int(sPos)-angles_BSEWG[1])>20 or (int(ePos)-angles_BSEWG[2])>20 or (int(bPos)-angles_BSEWG[0])>20):
             arrived = False
@@ -129,26 +124,28 @@ def LSSA_moveMotors(angles_BSEWG):
             eStat = elbow.getStatus()
             bStat = base.getStatus()
             gStat = gripper.getStatus()
-            print("- Not arrived yet")
+            print("- Hasn't arrived yet")
             # If the status is None
             if (wStat is None or sStat is None or eStat is None or bStat is None):
-                print("\n- Status = None Type")
+                pass
             # If a servo is Outside limits, Stuck, Blocked or in Safe Mode before it reaches the requested position return issue = True
             elif (wStat>'6' or sStat>'6' or eStat>'6' or bStat>'6' or gStat>'6'):
                 issue = True
-                print("\n- Issue detected")
+                print("- Issue detected")
+                allMotors.reset
                 allMotors.setColorLED(lssc.LSS_LED_Red)
+                time.sleep(2)
             # If all the servos are holding positions check if they have arrived
             elif (wStat=='6' and sStat=='6' and eStat=='6' and bStat=='6' and gStat=='6'):
-                print("- Holding position")
                 if ((int(wrist.getPosition())-angles_BSEWG[3])>20 or (int(shoulder.getPosition())-angles_BSEWG[1])>20 or (int(elbow.getPosition())-angles_BSEWG[2])>20 or (int(base.getPosition())-angles_BSEWG[0])>20):
+                    print("- Obstacle detected")
                     issue = True
                 else:
+                    print("- Holding position")
                     arrived = True
         # If it reached the requested position return arrived = True
         else:
             arrived = True
-            print("- Arrived")
 
     return(arrived)
 
@@ -170,24 +167,21 @@ def CBtoXY(targetCBsq, params):
             sqletter = wletterWeight[ord(targetCBsq[0]) - 97]
             sqNumber = int(targetCBsq[1])
 
-        offset = params["baseradius"] + params["cbFrame"]
-        x = offset + params["sqSize"] * sqNumber - 3*params["sqSize"]/4
-        y = params["sqSize"] * sqletter - copysign(params["sqSize"]/2,sqletter)
+        x = params["baseradius"] + params["cbFrame"] + params["sqSize"] * sqNumber - params["sqSize"]*1/2
+        y = params["sqSize"] * sqletter - copysign(params["sqSize"]*1/2,sqletter)
 
     return(x,y)
 
 def executeMove(move, params, color):
     global playerColor
-    global serial
     moveState = False
     playerColor = color
     allMotors.setColorLED(lssc.LSS_LED_Cyan)
     z = params["cbHeight"] + params["pieceHeight"]
     angles_rest = (0,-1100,450,1100,0)
-    gripper = lss.LSS(5)
-    gClose = -3
-    gOpen = -11
-    goDown = 2/3*params["pieceHeight"]
+    gClose = -2
+    gOpen = -8
+    goDown = 0.6*params["pieceHeight"]
     gripState = gOpen
     
     for i in range(0,len(move),2):
@@ -196,6 +190,7 @@ def executeMove(move, params, color):
         x, y = CBtoXY((move[i],move[i+1]), params)
         angles_BSEWG1 = LSS_IK([x, y, z + 1, gripState])
         print("1) MOVE UP")
+        #print("x: " + str(x) + " y: " + str(y) + " z: " + str(z+1))
         arrived1 = LSSA_moveMotors(angles_BSEWG1)
         print("* Arrived: " + str(arrived1) + "\n")
         askPermision(angles_BSEWG1, arrived1)
@@ -203,21 +198,22 @@ def executeMove(move, params, color):
         # Go down
         angles_BSEWG2 = LSS_IK([x, y, z - 1 - goDown, gripState])
         print("2) GO DOWN")
+        #print("x: " + str(x) + " y: " + str(y) + " z: " + str(z))
         arrived2 = LSSA_moveMotors(angles_BSEWG2)
         print("* Arrived: " + str(arrived2) + "\n")
         askPermision(angles_BSEWG2, arrived2)
 
         if (i/2)%2: # Uneven move (go lower to grab the piece)
             gripState = gOpen
-            goDown = 2/3*params["pieceHeight"]
-        else:       # Even move (go higher to drop the piece)
+            goDown = 0.6*params["pieceHeight"]
+        else:       # Even move (go a little higher to drop the piece)
             gripState = gClose
-            goDown = 1/3*params["pieceHeight"]
+            goDown = 0.5*params["pieceHeight"]
 
         # Close / Open the gripper
-        gripper.moveCH(gripState*10, 500)
-        print("3) CLOSE/OPEN the gripper\n")
+        gripper.moveCH(gripState*10, 600)
         time.sleep(1)
+        print("3) CLOSE/OPEN the gripper\n")
         
         # Go up
         angles_BSEWG3 = LSS_IK([x, y, z + 1, gripState])
@@ -237,19 +233,20 @@ def executeMove(move, params, color):
 
 def askPermision(angles_BSEWG, arrived):
     global homography
-    global serial
 
     angles_rest = (0,-1100,450,1100,0)
     sec = 0
 
     while arrived == False:                                 # If the servos couldn't reach the requested position
-        allMotors.setColorLED(lssc.LSS_LED_Red)             # Change LEDs to red
-        arrived = LSSA_moveMotors(angles_rest)              # Go to resting position
+        allMotors.setColorLED(lssc.LSS_LED_Magenta)         # Change LEDs to Magenta
+        _ = LSSA_moveMotors(angles_rest)                    # Go to resting position
         allMotors.limp()
         if sec == 0:
-            speak("excuse")                                 # Play sound asking for permission
+            #interface.speak("excuse")                       # Play audio asking for permission
+            pass
         else:
-            speak("please")
+            pass
+            #speak("please")
         sec = 0
 
         # while arrived == False and sec < 5:                 # If the servos couldn't reach the requested position and we haven't waited 5 sec
@@ -260,21 +257,15 @@ def askPermision(angles_BSEWG, arrived):
         #         time.sleep(1)                               # Wait one second
         #     sec = sec + 1
 
-        # Debugging
+        # Debugging w/o camera
         while arrived == False and sec < 5:                 # If the servos couldn't reach the requested position and we haven't waited 5 sec
             if sec == 4:                                    # We check if we have waited 5 sec
+                print("-- Trying to move again")
                 allMotors.setColorLED(lssc.LSS_LED_Cyan)    # If it is true we change LEDs back to cyan
                 arrived = LSSA_moveMotors(angles_BSEWG)     # And try moving the servos again
-            else:
-                time.sleep(1)                               # Wait one second
+                print("- Arrived: " + str(arrived) + "\n")
+            time.sleep(1)
             sec = sec + 1
-
-def speak(text):
-    #audio_created = gTTS(text = text, lang = 'en', slow = False)
-    #audio_created.save('C:/Users/geral/Dropbox/Robot_Arm/mp3_files/voice.mp3')
-    path = str(pathlib.Path().absolute())
-    filename = path + "/mp3_files/" + text + ".mp3"
-    os.system(filename)
 
 def winLED(allMotors):
     for i in range (0, 4):
@@ -283,6 +274,7 @@ def winLED(allMotors):
             time.sleep(0.3)                     # Wait 0.3 seconds per color change
     allMotors.setColorLED(lssc.LSS_LED_Black)
 
-#############################################################################################################################
-
-   
+# move = "e1f2"
+# params = {"baseradius": 1.77, "cbFrame": 0.62, "sqSize": 1.09, "cbHeight": 0.80, "pieceHeight": 1.97}
+# color = 0
+# executeMove(move, params, color)
