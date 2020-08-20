@@ -10,7 +10,7 @@ import sys
 import json
 import VisionModule as vm
 import platform
-import ArmControl as ac
+#import ArmControl as ac
 import lss_const as lssc
 import pygame
 import pathlib
@@ -97,6 +97,7 @@ prevIMG = []
 chessRoute = ""
 detected = True
 selectedCam = 0
+skillLevel = 20     # difficulty level of chess engine
 cap = cv2.VideoCapture()
 rotMat = vm.np.zeros((2,2))
 phisicalParams = {"baseradius": 0.00,
@@ -155,7 +156,7 @@ def pcTurn(board,engine):
         speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
 
-    ac.executeMove(sequence["seq"],phisicalParams, playerColor)
+    #ac.executeMove(sequence["seq"],phisicalParams, playerColor)
     state = "robotMove"
     updateBoard(window, sequence)
 
@@ -164,6 +165,7 @@ def startEngine():
     global state
     print ("startEngine")
     engine = cl.chess.engine.SimpleEngine.popen_uci(chessRoute)
+    engine.configure({"Skill Level": skillLevel})
     if playerColor:
         state = "playerTurn"
     else:
@@ -403,6 +405,7 @@ def newGameWindow (): #gameState: config
     global detected
     global cap
     global selectedCam
+    global skillLevel
     i = 0
 
     windowName = "Configuration"
@@ -410,6 +413,7 @@ def newGameWindow (): #gameState: config
                 [sg.CBox('Play As White', key='userWhite', default = playerColor)],
                 [sg.Spin([sz for sz in range(1, 300)], initial_value=10, font='Any 11',key='timeInput'),sg.Text('Time in minutes', pad=(0,0))],
                 [sg.Radio('RPi Cam', group_id='grp', default = True), sg.Radio('USB Cam', group_id='grp')],
+                [sg.Combo([sz for sz in range(0, 11)], key="enginelevel"),sg.Text('Engine Skill Level', pad=(0,0))],
                 [sg.Text('_'*30)],
                 [sg.Button("Exit"), sg.Submit("Next")]]
     windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(initGame)
@@ -419,11 +423,13 @@ def newGameWindow (): #gameState: config
             while value[i] == False and i<2:
                 i+=1
             selectedCam = i
-            cap = initCam(i)
+            #cap = initCam(i)
             if detected:
                 newGameState = "calibration" 
-                #newGameState = "initGame"
+                newGameState = "initGame"
                 playerColor = value["userWhite"]
+                skillLevel = value["enginelevel"]*2
+                print(skillLevel)
                 gameTime = float(value["timeInput"]*60)
             break
         if button in (None, 'Exit'): # MAIN WINDOW
@@ -727,12 +733,12 @@ def main():
             gameResult = board.result()
             if gameResult == "1-0":
                 window.FindElement(key = "gameMessage").Update("Game Over" + "\nWhite Wins")
-                if not playerColor:    # If the player color is black -> robot color is white
-                    ac.winLED(ac.allMotors)
+                # if not playerColor:    # If the player color is black -> robot color is white
+                #     ac.winLED(ac.allMotors)
             elif gameResult == "0-1":
                 window.FindElement(key = "gameMessage").Update("Game Over" + "\nBlack Wins")
-                if playerColor:        # If the player color is white -> robot color is black
-                    ac.winLED(ac.allMotors)
+                # if playerColor:        # If the player color is white -> robot color is black
+                #     ac.winLED(ac.allMotors)
             elif gameResult == "1/2-1/2":
                 window.FindElement(key = "gameMessage").Update("Game Over" + "\nDraw")
             quitGame()
