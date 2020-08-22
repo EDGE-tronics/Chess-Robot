@@ -173,9 +173,12 @@ def startEngine():
 
 def playerTurn(board,squares):
     result = cl.moveAnalysis(squares, board)
+    piece = ""
     if result:
         if result["type"] == "Promotion":
-            result["move"] += "q"
+            while not piece:
+                piece = coronationWindow()
+            result["move"] += piece
         sequence = cl.sequenceGenerator(result["move"], board)
         window.FindElement(key = "gameMessage").Update(sequence["type"])
         board.push_uci(result["move"])
@@ -437,6 +440,50 @@ def newGameWindow (): #gameState: config
             break   
     windowNewGame.close() 
 
+def coronationWindow (): #gameState: config
+    global playerColor
+    pieceSelected = ""
+    rook = rookB
+    knight = knightB
+    bishop = bishopB
+    queen = queenB
+    if playerColor:
+        rook = rookW
+        knight = knightW
+        bishop = bishopW
+        queen = queenW
+
+    windowName = "Promotion"
+    pieceSelection = [[sg.Text('Select the piece for promotion', justification='center', pad = (25,(5,15)), font='Any 15')],
+                [sg.Button('', image_filename=rook, size=(1, 1),
+                          border_width=0, button_color=('white', "brown"),
+                          pad=((40,0), 0), key="rook"),sg.Button('', image_filename=knight, size=(1, 1),
+                          border_width=0, button_color=('white', "brown"),
+                          pad=(0, 0), key="knight"),sg.Button('', image_filename=bishop, size=(1, 1),
+                          border_width=0, button_color=('white', "brown"),
+                          pad=(0, 0), key="bishop"),sg.Button('', image_filename=queen, size=(1, 1),
+                          border_width=0, button_color=('white', "brown"),
+                          pad=(0, 0), key="queen")]]
+    windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(pieceSelection)
+    while True:
+        button,value = windowNewGame.Read()
+        if button == "rook":
+            pieceSelected = "r"
+            break
+        if button == "knight":
+            pieceSelected = "k"
+            break
+        if button == "bishop":
+            pieceSelected = "b"
+            break
+        if button == "queen":
+            pieceSelected = "q"
+            break
+        if button in (None, 'Exit'): # MAIN WINDOW
+            break   
+    windowNewGame.close() 
+    return pieceSelected
+
 def takePIC():  
     global selectedCam
 
@@ -687,7 +734,6 @@ def main():
                 whiteTime = gameTime
                 blackTime = gameTime
                 refTime = time.time()
-
                 startEngineThread = threading.Thread(target=startEngine, daemon=True)
                 startEngineThread.start()
                 state = "stby"
