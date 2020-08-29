@@ -21,6 +21,12 @@ def findTransformation(img,cbPattern):
     
     return(retIMG, H)
 
+def applyRotation(img,R):
+    if R.any() != 0:
+        img = cv2.warpAffine(img, R, img.shape[1::-1], flags=cv2.INTER_LINEAR)
+        
+    return(img)
+
 def applyTransformations(img,H,R):
 
     img = cv2.warpPerspective(img, H, (400, 400))
@@ -53,6 +59,11 @@ def findRotation(theta):
 
 def findMoves(img1, img2):
     
+    cv2.imshow("image1",img1)
+    cv2.imshow("image2",img2)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
     size = 50
     img1SQ = img2SQ = []
     largest = [0, 0, 0, 0]
@@ -71,19 +82,13 @@ def findMoves(img1, img2):
                     coordinates.pop()
                     break
 
-    # Print results (For testing)
-    print("Largest color difference between images:")
-    print(largest)
-    print("All coordinates:")
-    print(coordinates)
-
     # Make threshold with a percentage of the change in color of the biggest two
     thresh = (largest[0]+largest[1])/2*(0.5)
     for t in range(3,1,-1):
         if largest[t] < thresh:
             coordinates.pop()
 
-    # Print results (For testing)
+    Print results (For testing)
     print("Moves:")
     print(coordinates)
     
