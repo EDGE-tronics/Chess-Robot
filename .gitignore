@@ -1,4 +1,3 @@
-test_images/
 env/
 __pycache__/
-params.txt
+params
