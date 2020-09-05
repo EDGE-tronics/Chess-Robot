@@ -36,29 +36,18 @@ Dark
 CHESS_PATH = 'pieces_images'  # path to the chess pieces
 
 BLANK = 0  # piece names
-PAWNB = 1
-KNIGHTB = 2
-BISHOPB = 3
-ROOKB = 4
-KINGB = 5
-QUEENB = 6
-PAWNW = 7
-KNIGHTW = 8
-BISHOPW = 9
-ROOKW = 10
-KINGW = 11
-QUEENW = 12
-
-initial_board = [[ROOKB, KNIGHTB, BISHOPB, QUEENB, KINGB, BISHOPB, KNIGHTB, ROOKB],
-                 [PAWNB, ] * 8,
-                 [BLANK, ] * 8,
-                 [BLANK, ] * 8,
-                 [BLANK, ] * 8,
-                 [BLANK, ] * 8,
-                 [PAWNW, ] * 8,
-                 [ROOKW, KNIGHTW, BISHOPW, QUEENW, KINGW, BISHOPW, KNIGHTW, ROOKW]]
-
-psg_board = copy.deepcopy(initial_board)
+PAWNW = 1
+KNIGHTW = 2
+BISHOPW = 3
+ROOKW = 4
+QUEENW = 5
+KINGW = 6
+PAWNB = 7
+KNIGHTB = 8
+BISHOPB = 9
+ROOKB = 10
+QUEENB = 11
+KINGB = 12
 
 blank = os.path.join(CHESS_PATH, 'blank.png')
 bishopB = os.path.join(CHESS_PATH, 'nbishopb.png')
@@ -79,7 +68,9 @@ images = {BISHOPB: bishopB, BISHOPW: bishopW, PAWNB: pawnB, PAWNW: pawnW, KNIGHT
 
 wclock = os.getcwd() + '/interface_images/wclock.png'
 bclock = os.getcwd() + '/interface_images/bclock.png'
+FENCODE = ""
 
+colorTurn = True
 graveyard = 'k0'
 playerColor = True
 playing =  False
@@ -127,37 +118,25 @@ def pcTurn(board,engine):
     if board.is_checkmate():
         window.FindElement(key = "robotMessage").Update("CHECKMATE!")
         command = "checkmate"
-        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
-        speakThread.start()
     elif board.is_check():
         window.FindElement(key = "robotMessage").Update("CHECK!")
         command = "check"
-        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
-        speakThread.start()
     elif sequence["type"] == "White Queen Side Castling" or sequence["type"] == "Black Queen Side Castling":
         command = "q_castling"
-        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
-        speakThread.start()
     elif sequence["type"] == "White King Side Castling" or sequence["type"] == "Black King Side Castling":
         command = "k_castling"
-        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
-        speakThread.start()
     elif sequence["type"] == "Capture":
         command = "capture"
-        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
-        speakThread.start()
     elif sequence["type"] == "Passant":
         command = "passant"
-        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
-        speakThread.start()
     elif sequence["type"] == "Promotion":
         command = "promotion"
+    if command:
         speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
-
-    ac.executeMove(sequence["seq"],phisicalParams, playerColor)
+    #ac.executeMove(sequence["seq"],phisicalParams, playerColor)
     state = "robotMove"
-    updateBoard(window, sequence)
+    updateBoard(sequence, board)
 
 def startEngine():
     global engine
@@ -165,7 +144,7 @@ def startEngine():
     print ("startEngine")
     engine = cl.chess.engine.SimpleEngine.popen_uci(chessRoute)
     engine.configure({"Skill Level": skillLevel})
-    if playerColor:
+    if playerColor == colorTurn:
         state = "playerTurn"
     else:
         state = "pcTurn"
@@ -178,24 +157,29 @@ def playerTurn(board,squares):
             while not piece:
                 piece = coronationWindow()
             result["move"] += piece
+            
         sequence = cl.sequenceGenerator(result["move"], board)
         window.FindElement(key = "gameMessage").Update(sequence["type"])
         board.push_uci(result["move"])
-        updateBoard(window, sequence)
+        updateBoard(sequence,board)
         return True
     else:
         return False
 
 def startGame():
-    global psg_board
+    global gameTime
     window.FindElement("newGame").Update(disabled=True)
     window.FindElement("quit").Update(disabled=False)
-    psg_board = copy.deepcopy(initial_board)
-    redrawBoard()
+    window.FindElement(key = "wcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
+    window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
+    window.FindElement(key = "clockButton").Update(image_filename=wclock)
+    window.FindElement(key = "robotMessage").Update("Good Luck!")
+    window.FindElement(key = "gameMessage").Update("--")
 
 def quitGame():
     window.FindElement("newGame").Update(disabled=False)
     window.FindElement("quit").Update(disabled=True)
+    engine.quit()
 
 #   INTERFACE FUNCTIONS
 
@@ -208,45 +192,60 @@ def renderSquare(image, key, location):
                           border_width=0, button_color=('white', color),
                           pad=(0, 0), key=key)
 
-def redrawBoard():
+def redrawBoard(board):
     columns = 'abcdefgh'
     global playerColor
     if playerColor:
+        sq = 63
         for i in range(8):
             window.FindElement(key = str(8-i)+"r").Update("   "+str(8-i))
             window.FindElement(key = str(8-i)+"l").Update(str(8-i)+"   ")
             for j in range(8):
                 window.FindElement(key = columns[j]+"t").Update(columns[j])
                 window.FindElement(key = columns[j]+"b").Update(columns[j])    
-                color = blackSquareColor if (i + j) % 2 else whiteSquareColor
-                piece_image = images[initial_board[i][j]]
-                elem = window.FindElement(key=(i, j))
+                color = blackSquareColor if (i + 7-j) % 2 else whiteSquareColor
+                pieceNum = board.piece_type_at(sq)
+                if pieceNum:
+                    if not board.color_at(sq):
+                        pieceNum += 6
+                else:
+                    pieceNum = 0
+                piece_image = images[pieceNum]
+                elem = window.FindElement(key=(i, 7-j))
                 elem.Update(button_color=('white', color),
                             image_filename=piece_image, )
+                sq -= 1
     else:
+        sq = 0
         for i in range(8):
             window.FindElement(key = str(8-i)+"r").Update("   "+str(i+1))
             window.FindElement(key = str(8-i)+"l").Update(str(i+1)+"   ")
             for j in range(8):
                 window.FindElement(key = columns[j]+"t").Update(columns[7-j])
                 window.FindElement(key = columns[j]+"b").Update(columns[7-j]) 
-                color = blackSquareColor if (i + j) % 2 else whiteSquareColor
-                piece_image = images[initial_board[7-i][7-j]]
-                elem = window.FindElement(key=(i, j))
+                color = blackSquareColor if (i + 7-j) % 2 else whiteSquareColor
+                pieceNum = board.piece_type_at(sq)
+                if pieceNum:
+                    if not board.color_at(sq):
+                        pieceNum += 6
+                else:
+                    pieceNum = 0
+                piece_image = images[pieceNum]
+                elem = window.FindElement(key=(i, 7-j))
                 elem.Update(button_color=('white', color),
                             image_filename=piece_image, )
+                sq += 1
 
-def updateBoard(window, move):
+def updateBoard(move, board):
     global playerColor
+    global images
     for cont in range(0,len(move["seq"]),4):
         squareCleared = move["seq"][cont:cont+2]
-        squareOcuped = move["seq"][cont+2:cont+4]
-        y = cl.chess.square_file(cl.chess.SQUARE_NAMES.index(squareCleared))
-        x = 7 - cl.chess.square_rank(cl.chess.SQUARE_NAMES.index(squareCleared))
-
-        piece_image = images[psg_board[x][y]] 
-        piece = psg_board[x][y]
-        psg_board[x][y] = BLANK
+        squareOcupied = move["seq"][cont+2:cont+4]
+        scNum = cl.chess.SQUARE_NAMES.index(squareCleared)
+        
+        y = cl.chess.square_file(scNum)
+        x = 7 - cl.chess.square_rank(scNum)
         color = blackSquareColor if (x + y) % 2 else whiteSquareColor
         if playerColor:
             elem = window.FindElement(key=(x, y))
@@ -255,17 +254,20 @@ def updateBoard(window, move):
         elem.Update(button_color=('white', color),
                     image_filename=blank, )  
 
-        if squareOcuped != graveyard:
-            y = cl.chess.square_file(cl.chess.SQUARE_NAMES.index(squareOcuped))
-            x = 7 - cl.chess.square_rank(cl.chess.SQUARE_NAMES.index(squareOcuped))
-            psg_board[x][y] = piece
+        if squareOcupied != graveyard:
+            soNum = cl.chess.SQUARE_NAMES.index(squareOcupied)
+            pieceNum = board.piece_type_at(soNum)
+            if not board.color_at(soNum):
+                pieceNum += 6
+            y = cl.chess.square_file(soNum)
+            x = 7 - cl.chess.square_rank(soNum)
             color = blackSquareColor if (x + y) % 2 else whiteSquareColor
             if playerColor:
                 elem = window.FindElement(key=(x, y))
             else:
                 elem = window.FindElement(key=(7-x, 7-y))    
             elem.Update(button_color=('white', color),
-                        image_filename=piece_image, )         
+                        image_filename=images[pieceNum], )         
 
 def sideConfig(): # gameState: sideConfig
     global newGameState
@@ -273,7 +275,6 @@ def sideConfig(): # gameState: sideConfig
     global whiteSide
     global prevIMG
     global rotMat
-    
     i = 0
 
     img = vm.drawQuadrants(prevIMG)
@@ -285,7 +286,7 @@ def sideConfig(): # gameState: sideConfig
                 [sg.Radio('1-2', group_id='grp', default = True,font='Any 14'), sg.Radio('2-3', group_id='grp',font='Any 14'),sg.Radio('4-3', group_id='grp',font='Any 14'), sg.Radio('1-4', group_id='grp',font='Any 14')],
                 [sg.Text('_'*30)],
                 [sg.Button("Back"), sg.Submit("Play")]]
-    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, location = (100,50), icon='kingb.ico').Layout(initGame) 
+    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, location = (100,50), icon='interface_images/robot_icon.ico').Layout(initGame) 
 
     while True:
         button,value = newGameWindow.Read(timeout=100)
@@ -303,7 +304,7 @@ def sideConfig(): # gameState: sideConfig
                 theta = -90
             elif  whiteSide == 3:
                 theta = 0
-            rotMat = []
+
             rotMat = vm.findRotation(theta)
             prevIMG = vm.applyRotation(prevIMG,rotMat)
             break
@@ -329,14 +330,14 @@ def ocupiedBoard(): # gameState: ocupiedBoard
                 [sg.Image(filename='', key='boardVideo')],
                 [sg.Text('_'*30)],
                 [sg.Button("Back"), sg.Submit("Next")]]
-    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, location = (100,50), icon='kingb.ico').Layout(initGame)  
+    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, location = (100,50), icon='interface_images/robot_icon.ico').Layout(initGame)  
 
     while True:
         button,value = newGameWindow.Read(timeout = 10)
 
         if detected:    
             frame = takePIC()
-            prevIMG = vm.applyTransformations(frame,homography,rotMat)
+            prevIMG = vm.applyHomography(frame,homography)
             imgbytes = cv2.imencode('.png', prevIMG)[1].tobytes()
             newGameWindow.FindElement('boardVideo').Update(data=imgbytes)
 
@@ -367,7 +368,7 @@ def calibration(): # gameState: calibration
                 [sg.Image(filename='', key='boardVideo')],
                 [sg.Text('_'*30)],
                 [sg.Button("Back"), sg.Submit("Next")]]
-    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, location = (100,50), icon='kingb.ico').Layout(initGame) 
+    newGameWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, location = (100,50), icon='interface_images/robot_icon.ico').Layout(initGame) 
 
     while True:
         button,value = newGameWindow.Read(timeout = 10)
@@ -379,7 +380,7 @@ def calibration(): # gameState: calibration
             homography = []
             retIMG, homography = vm.findTransformation(frame,cbPattern)
             if retIMG:
-                newGameWindow.FindElement('calibrationBoard').Update("Camera calibration successful, press Next")
+                newGameWindow.FindElement('calibrationBoard').Update("Camera calibration successful. Please press Next")
             else:
                 newGameWindow.FindElement('calibrationBoard').Update("Please adjust your camera and remove any chess piece")
 
@@ -416,7 +417,7 @@ def newGameWindow (): # gameState: config
                 [sg.Frame('Camera Selection', frame_layout, pad=(0, 10), title_color='white')],
                 [sg.Text('_'*30)],
                 [sg.Button("Exit"), sg.Submit("Next")]]
-    windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(initGame)
+    windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='interface_images/robot_icon.ico').Layout(initGame)
     while True:
         button,value = windowNewGame.Read()
         if button == "Next":
@@ -428,7 +429,7 @@ def newGameWindow (): # gameState: config
                 selectedCam = 2
             cap = initCam(selectedCam)
             if detected:
-                newGameState = "calibration" 
+                newGameState = "calibration"
                 playerColor = value["userWhite"]
                 skillLevel = value["enginelevel"]*2
                 print(skillLevel)
@@ -463,7 +464,7 @@ def coronationWindow (): # gameState: config
                           pad=(0, 0), key="bishop"),sg.Button('', image_filename=queen, size=(1, 1),
                           border_width=0, button_color=('white', "brown"),
                           pad=(0, 0), key="queen")]]
-    windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(pieceSelection)
+    windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='interface_images/robot_icon.ico').Layout(pieceSelection)
     while True:
         button,value = windowNewGame.Read()
         if button == "rook":
@@ -504,7 +505,7 @@ def quitGameWindow ():
     quitGame = [[sg.Text('Are you sure?',justification='center', size=(30, 1), font='Any 13')], [sg.Submit("Yes",  size=(15, 1)),sg.Submit("No", size=(15, 1))]]
     if playing:
         while True:
-            windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(quitGame)
+            windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='interface_images/robot_icon.ico').Layout(quitGame)
             button,value = windowNewGame.Read()
             if button == "Yes":
                 playing = False
@@ -521,8 +522,6 @@ def mainBoardLayout():
     # ------ Layout ------ # 
     # sg.SetOptions(margins=(0,0))
     sg.ChangeLookAndFeel('Dark')
-    # Create initial board setup
-    board = copy.deepcopy(initial_board)
     # Main board display layout
     board_layout = [[sg.T(' '*12)] + [sg.T('{}'.format(a), pad=((0,47),0), font='Any 13', key = a+'t') for a in 'abcdefgh']]
     # Loop though board and create buttons with images
@@ -530,8 +529,7 @@ def mainBoardLayout():
         numberRow = 8-i 
         row = [sg.T(str(numberRow)+'   ', font='Any 13', key = str(numberRow)+"l")]
         for j in range(8):
-            piece_image = images[board[i][j]]
-            row.append(renderSquare(piece_image, key=(i,j), location=(i,j)))
+            row.append(renderSquare(blank, key=(i,j), location=(i,j)))
         row.append(sg.T('   '+str(numberRow), font='Any 13', key = str(numberRow)+"r"))
         board_layout.append(row)
     # Add labels across bottom of board
@@ -603,7 +601,7 @@ def phisicalConfig ():
                         [sg.Submit("Save",  size=(15, 1)),sg.Submit("Close", size=(15, 1))]]
 
     while True:
-        robotParamWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(robotParamLayout)
+        robotParamWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='interface_images/robot_icon.ico').Layout(robotParamLayout)
         button,value = robotParamWindow.Read()
         if button == "Save":
             phisicalParams = {"baseradius": value[0],
@@ -620,7 +618,7 @@ def phisicalConfig ():
     robotParamWindow.close()   
 
 layout = mainBoardLayout()
-window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_buttons=False, icon='kingb.ico').Layout(layout)
+window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_buttons=False, icon='interface_images/robot_icon.ico').Layout(layout)
 
 def speak(command):
     pygame.mixer.init()
@@ -640,6 +638,7 @@ def main():
     global prevIMG
     global rotMat
     global homography
+    global colorTurn
 
     systemConfig()
     loadParams()
@@ -649,11 +648,16 @@ def main():
     whiteTime = 0
     blackTime = 0
     refTime = time.time()
+    board = cl.chess.Board()
 
     while True :
         button, value = window.Read(timeout=100)
 
         if button in (None, 'Exit') or value["manubar"]=="Exit": # MAIN WINDOW
+            angles_rest = (0,-1100,450,1100,0)
+            _ = ac.LSSA_moveMotors(angles_rest)
+            ac.allMotors.limp()
+            ac.allMotors.setColorLED(lssc.LSS_LED_Black)
             break
 
         if value["manubar"]=="Parameters":
@@ -670,7 +674,7 @@ def main():
                 sg.popup_error('Please configure the robot parameters in the File/Parameters option of menu bar')
 
         if button =="quit":
-            print("entro en quit")
+            ac.allMotors.setColorLED(lssc.LSS_LED_Black)
             quitGameWindow()
             if not playing:
                 state = "showGameResult"
@@ -693,7 +697,8 @@ def main():
                 window.FindElement(key = "gameMessage").Update("Time Out\n"+ "White Wins")
 
         if state == "stby": # stby
-            print(state)
+            #print(state)
+            pass
 
         elif state == "startMenu": # Start Menu
             print(state)
@@ -708,13 +713,11 @@ def main():
             elif newGameState == "initGame":
                 playing = True
                 newGameState = "config"
-                startGame()
                 board = cl.chess.Board()
-                window.FindElement(key = "wcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
-                window.FindElement(key = "bcount").Update(time.strftime("%H:%M:%S", time.gmtime(gameTime)))
-                window.FindElement(key = "clockButton").Update(image_filename=wclock)
-                window.FindElement(key = "robotMessage").Update("Good Luck!")
-                window.FindElement(key = "gameMessage").Update("--")
+                if FENCODE:
+                    board = cl.chess.Board(FENCODE)
+                colorTurn = board.turn
+                startGame()
                 whiteTime = gameTime
                 blackTime = gameTime
                 refTime = time.time()
@@ -722,17 +725,20 @@ def main():
                 startEngineThread.start()
                 speak("good_luck")
                 state = "stby"
-                
+                redrawBoard(board)
+
         elif state == "playerTurn": # Player Turn
             if button == "clockButton":
                 currentIMG = takePIC()
-                curIMG = vm.applyTransformations(currentIMG,homography,rotMat)
+                curIMG = vm.applyHomography(currentIMG,homography)
+                curIMG = vm.applyRotation(curIMG,rotMat)
                 squares = vm.findMoves(prevIMG, curIMG)
                 print(squares)
                 if playerTurn(board, squares):
                     state = "pcTurn"
                 else:
                     window.FindElement(key = "gameMessage").Update("Invalid move!")
+                    speak("invalid_move")
                     state = "playerTurn"
         
         elif state == "pcTurn": # PC turn
@@ -750,7 +756,8 @@ def main():
         elif state == "robotMove": # Robotic arm turn
             print(state)
             previousIMG = takePIC()
-            prevIMG = vm.applyTransformations(previousIMG,homography,rotMat)
+            prevIMG = vm.applyHomography(previousIMG,homography)
+            prevIMG = vm.applyRotation(prevIMG,rotMat)
             state = "playerTurn"
             window.FindElement(key = "robotMessage").Update("---")
             if board.turn:
@@ -776,7 +783,6 @@ def main():
             window.FindElement(key = "robotMessage").Update("Goodbye")
             speak("goodbye")
             quitGame()
-            engine.quit()
             state = "stby"
             
         if playing:
