@@ -7,7 +7,6 @@ import VisionModule as vm
 import lss
 import lss_const as lssc
 import platform
-#from Interface import speak
 
 if platform.system() == 'Windows':
     port = "COM3"
@@ -114,7 +113,7 @@ def LSSA_moveMotors(angles_BSEWG):
         ePos = elbow.getPosition()
         bPos = base.getPosition()
         # If the position is None
-        if (wPos is None or sPos is None or ePos is None or bPos is None):
+        if not (wPos and sPos and ePos and bPos):
             arrived = False
         # If it hasn't reached the requested position return arrived = False
         elif ((int(wPos)-angles_BSEWG[3])>20 or (int(sPos)-angles_BSEWG[1])>20 or (int(ePos)-angles_BSEWG[2])>20 or (int(bPos)-angles_BSEWG[0])>20):
@@ -125,24 +124,23 @@ def LSSA_moveMotors(angles_BSEWG):
             bStat = base.getStatus()
             gStat = gripper.getStatus()
             print("- Hasn't arrived yet")
-            # If the status is None
-            if (wStat is None or sStat is None or eStat is None or bStat is None):
-                pass
-            # If a servo is Outside limits, Stuck, Blocked or in Safe Mode before it reaches the requested position return issue = True
-            elif (wStat>'6' or sStat>'6' or eStat>'6' or bStat>'6' or gStat>'6'):
-                issue = True
-                print("- Issue detected")
-                allMotors.reset
-                allMotors.setColorLED(lssc.LSS_LED_Red)
-                time.sleep(2)
-            # If all the servos are holding positions check if they have arrived
-            elif (wStat=='6' and sStat=='6' and eStat=='6' and bStat=='6' and gStat=='6'):
-                if ((int(wrist.getPosition())-angles_BSEWG[3])>20 or (int(shoulder.getPosition())-angles_BSEWG[1])>20 or (int(elbow.getPosition())-angles_BSEWG[2])>20 or (int(base.getPosition())-angles_BSEWG[0])>20):
-                    print("- Obstacle detected")
+            # If the statuses aren't None we check their values
+            if (wStat and sStat and eStat and bStat and gStat):
+                # If a servo is Outside limits, Stuck, Blocked or in Safe Mode before it reaches the requested position return issue = True
+                if (wStat>'6' or sStat>'6' or eStat>'6' or bStat>'6' or gStat>'6'):
                     issue = True
-                else:
-                    print("- Holding position")
-                    arrived = True
+                    print("- Issue detected")
+                    allMotors.reset
+                    allMotors.setColorLED(lssc.LSS_LED_Red)
+                    time.sleep(2)
+                # If all the servos are holding positions check if they have arrived
+                elif (wStat=='6' and sStat=='6' and eStat=='6' and bStat=='6' and gStat=='6'):
+                    if ((int(wrist.getPosition())-angles_BSEWG[3])>20 or (int(shoulder.getPosition())-angles_BSEWG[1])>20 or (int(elbow.getPosition())-angles_BSEWG[2])>20 or (int(base.getPosition())-angles_BSEWG[0])>20):
+                        print("- Obstacle detected")
+                        issue = True
+                    else:
+                        print("- Holding position")
+                        arrived = True
         # If it reached the requested position return arrived = True
         else:
             arrived = True
