@@ -27,13 +27,11 @@ def applyRotation(img,R):
         
     return(img)
 
-def applyTransformations(img,H,R):
+def applyHomography(img,H):
 
-    img = cv2.warpPerspective(img, H, (400, 400))
-    if R.any() != 0:
-        img = cv2.warpAffine(img, R, img.shape[1::-1], flags=cv2.INTER_LINEAR)
-        
-    return(img)
+    imgNEW = cv2.warpPerspective(img, H, (400, 400))
+    
+    return(imgNEW)
 
 def drawQuadrants(img):
 
@@ -87,10 +85,6 @@ def findMoves(img1, img2):
     for t in range(3,1,-1):
         if largest[t] < thresh:
             coordinates.pop()
-
-    Print results (For testing)
-    print("Moves:")
-    print(coordinates)
     
     return(coordinates)
 
