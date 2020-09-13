@@ -88,7 +88,7 @@ prevIMG = []
 chessRoute = ""
 detected = True
 selectedCam = 0
-skillLevel = 10     # difficulty level of chess engine
+skillLevel = 10     # Chess engine difficulty level
 cap = cv2.VideoCapture()
 rotMat = vm.np.zeros((2,2))
 phisicalParams = {"baseradius": 0.00,
@@ -134,7 +134,7 @@ def pcTurn(board,engine):
     if command:
         speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
-    #ac.executeMove(sequence["seq"],phisicalParams, playerColor)
+    ac.executeMove(sequence["seq"],phisicalParams, playerColor)
     state = "robotMove"
     updateBoard(sequence, board)
 
@@ -281,7 +281,7 @@ def sideConfig(): # gameState: sideConfig
     imgbytes = cv2.imencode('.png', img)[1].tobytes()
 
     windowName = "Calibration"
-    initGame = [[sg.Text('Please, choose the white side', justification='center', pad = (25,(5,15)), font='Any 15')],
+    initGame = [[sg.Text('Please select the "white" pieces side', justification='center', pad = (25,(5,15)), font='Any 15')],
                 [sg.Image(data=imgbytes, key='boardImg')],
                 [sg.Radio('1-2', group_id='grp', default = True,font='Any 14'), sg.Radio('2-3', group_id='grp',font='Any 14'),sg.Radio('4-3', group_id='grp',font='Any 14'), sg.Radio('1-4', group_id='grp',font='Any 14')],
                 [sg.Text('_'*30)],
@@ -326,7 +326,7 @@ def ocupiedBoard(): # gameState: ocupiedBoard
     global prevIMG
 
     windowName = "Calibration"
-    initGame = [[sg.Text('Please, place the chess pieces and press Next', justification='center', pad = (25,(5,15)), font='Any 15')],
+    initGame = [[sg.Text('Place the chess pieces and press Next', justification='center', pad = (25,(5,15)), font='Any 15')],
                 [sg.Image(filename='', key='boardVideo')],
                 [sg.Text('_'*30)],
                 [sg.Button("Back"), sg.Submit("Next")]]
@@ -364,7 +364,7 @@ def calibration(): # gameState: calibration
     cbPattern = cv2.imread(route+'interface_images/cb_pattern.jpg', cv2.IMREAD_GRAYSCALE)
 
     windowName = "Camera calibration"
-    initGame = [[sg.Text('Please, adjust your camera and remove any chess piece', justification='center', pad = (25,(5,15)), font='Any 15', key = "calibrationBoard")],
+    initGame = [[sg.Text('Please adjust your camera and remove any chess piece', justification='center', pad = (25,(5,15)), font='Any 15', key = "calibrationBoard")],
                 [sg.Image(filename='', key='boardVideo')],
                 [sg.Text('_'*30)],
                 [sg.Button("Back"), sg.Submit("Next")]]
@@ -516,8 +516,8 @@ def quitGameWindow ():
 
 def mainBoardLayout():
     # ------ Menu Definition ------ #      
-    menu_def = [['&File',["&Parameters","E&xit"]],      
-                ['&Help', 'About...'], ]  
+    menu_def = [['&Configuration',["&Dimensions","E&xit"]],      
+                ['&Help', 'About'], ]  
 
     # ------ Layout ------ # 
     # sg.SetOptions(margins=(0,0))
@@ -668,10 +668,9 @@ def main():
 
         if button =="newGame":
             if phisicalParams["baseradius"] and phisicalParams["cbFrame"] and phisicalParams["sqSize"] and phisicalParams["cbHeight"] and phisicalParams["pieceHeight"]: 
-                print("entro en new")
                 state = "startMenu"
             else:
-                sg.popup_error('Please configure the robot parameters in the File/Parameters option of menu bar')
+                sg.popup_error('Please configure the chess board dimensions in the Configuration option of menu bar')
 
         if button =="quit":
             ac.allMotors.setColorLED(lssc.LSS_LED_Black)
@@ -733,7 +732,7 @@ def main():
                 curIMG = vm.applyHomography(currentIMG,homography)
                 curIMG = vm.applyRotation(curIMG,rotMat)
                 squares = vm.findMoves(prevIMG, curIMG)
-                print(squares)
+                #print(squares)
                 if playerTurn(board, squares):
                     state = "pcTurn"
                 else:
