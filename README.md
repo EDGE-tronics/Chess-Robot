@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/Robotics-Technology/Chess-Robot/blob/master/interface_images/lss_arm_cb.png" width="400px"/>
+  <img src="https://github.com/Robotics-Technology/Chess-Robot/blob/master/interface_images/lss_arm_cb.png" width="200px"/>
 </p>
 
 # LSS Chess Robot
@@ -91,7 +91,7 @@ python Interface.py
 ```
 
 <p align="center">
-  <img src="https://github.com/Robotics-Technology/Chess-Robot/blob/master/interface_images/game_start.png" width="600px"/>
+  <img src="https://github.com/Robotics-Technology/Chess-Robot/blob/master/interface_images/game_start.png" width="500px"/>
 </p>
 
 ## Authors
