@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/Robotics-Technology/Chess-Robot/interface_images/lss_arm_cb.png"/>
+  <img src="https://github.com/Robotics-Technology/Chess-Robot/blob/master/interface_images/lss_arm_cb.png"/>
 </p>
 
 # LSS Chess Robot
