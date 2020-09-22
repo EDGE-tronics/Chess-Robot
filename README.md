@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/Robotics-Technology/Chess-Robot/blob/master/interface_images/lss_arm_cb.png"/>
+  <img src="https://github.com/Robotics-Technology/Chess-Robot/blob/master/interface_images/lss_arm_cb.png" width="400px"/>
 </p>
 
 # LSS Chess Robot
@@ -89,6 +89,10 @@ sudo pip3 install opencv-contrib-python==3.4.6.27
 cd <project_directory>
 python Interface.py
 ```
+
+<p align="center">
+  <img src="https://github.com/Robotics-Technology/Chess-Robot/blob/master/interface_images/game_start.png" width="600px"/>
+</p>
 
 ## Authors
 
