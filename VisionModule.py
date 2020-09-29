@@ -1,9 +1,14 @@
-# from picamera.array import PiRGBArray
-# from picamera import PiCamera
 import cv2
 import numpy as np
 import string
 import time
+import os
+
+try:
+    from picamera.array import PiRGBArray
+    from picamera import PiCamera
+except:
+    pass
 
 def findTransformation(img,cbPattern):
 
@@ -56,11 +61,6 @@ def findRotation(theta):
     return(rotMAT)
 
 def findMoves(img1, img2):
-    
-    cv2.imshow("image1",img1)
-    cv2.imshow("image2",img2)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
 
     size = 50
     img1SQ = img2SQ = []
@@ -88,9 +88,11 @@ def findMoves(img1, img2):
     
     return(coordinates)
 
-def safetoMove(H):
-    #cap = cv2.VideoCapture(1)
-    ret, img = cap.read()
+def safetoMove(H, cap):
+
+    route = os.getcwd() + '/'
+    cbPattern = cv2.imread(route+'interface_images/cb_pattern.jpg', cv2.IMREAD_GRAYSCALE)
+    _, img = cap.read()
     img = cv2.warpPerspective(img, H, (cbPattern.shape[1], cbPattern.shape[0]))
 
     # Kmeans algorithm (Map the image to only two colors)
