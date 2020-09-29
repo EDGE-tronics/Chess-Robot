@@ -110,6 +110,9 @@ def systemConfig():
 def pcTurn(board,engine):
     global sequence
     global state
+    global homography
+    global cap
+
     command = ""
     pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
     sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
@@ -134,14 +137,16 @@ def pcTurn(board,engine):
     if command:
         speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
-    ac.executeMove(sequence["seq"],phisicalParams, playerColor)
+    ac.executeMove(sequence["seq"], phisicalParams, playerColor, homography, cap)
     state = "robotMove"
     updateBoard(sequence, board)
 
 def startEngine():
     global engine
     global state
-    print ("startEngine")
+    global homography
+
+    #print ("startEngine")
     engine = cl.chess.engine.SimpleEngine.popen_uci(chessRoute)
     engine.configure({"Skill Level": skillLevel})
     if playerColor == colorTurn:
@@ -432,7 +437,7 @@ def newGameWindow (): # gameState: config
                 newGameState = "calibration"
                 playerColor = value["userWhite"]
                 skillLevel = value["enginelevel"]*2
-                print(skillLevel)
+                #print(skillLevel)
                 gameTime = float(value["timeInput"]*60)
             break
         if button in (None, 'Exit'): # MAIN WINDOW
@@ -682,16 +687,13 @@ def main():
         if playing:
             if board.is_game_over():
                 playing = False
-                print("GAME OVER")
                 state = "showGameResult"
             elif  whiteTime <= 0:
                 playing = False
-                print("GAME OVER")
                 state = "showGameResult"
                 window.FindElement(key = "gameMessage").Update("Time Out\n"+"Black Wins")
             elif  blackTime <= 0:
                 playing = False
-                print("GAME OVER")
                 state = "showGameResult"
                 window.FindElement(key = "gameMessage").Update("Time Out\n"+ "White Wins")
 
@@ -700,7 +702,7 @@ def main():
             pass
 
         elif state == "startMenu": # Start Menu
-            print(state)
+            #print(state)
             if newGameState == "config":
                 newGameWindow()
             elif newGameState == "calibration":
@@ -732,7 +734,6 @@ def main():
                 curIMG = vm.applyHomography(currentIMG,homography)
                 curIMG = vm.applyRotation(curIMG,rotMat)
                 squares = vm.findMoves(prevIMG, curIMG)
-                #print(squares)
                 if playerTurn(board, squares):
                     state = "pcTurn"
                 else:
@@ -741,7 +742,7 @@ def main():
                     state = "playerTurn"
         
         elif state == "pcTurn": # PC turn
-            print(state)
+            #print(state)
             
             if board.turn:
                 window.FindElement(key = "clockButton").Update(image_filename=wclock)
@@ -753,7 +754,7 @@ def main():
             state = "stby"         # Wait for the PC move, thread changes the state
 
         elif state == "robotMove": # Robotic arm turn
-            print(state)
+            #(state)
             previousIMG = takePIC()
             prevIMG = vm.applyHomography(previousIMG,homography)
             prevIMG = vm.applyRotation(prevIMG,rotMat)
@@ -765,7 +766,7 @@ def main():
                 window.FindElement(key = "clockButton").Update(image_filename=bclock)
 
         elif state == "showGameResult":
-            print(state)
+            #print(state)
             gameResult = board.result()
             if gameResult == "1-0":
                 window.FindElement(key = "gameMessage").Update("Game Over" + "\nWhite Wins")
