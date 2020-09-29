@@ -97,7 +97,7 @@ def LSS_IK(targetXYZG):
 
 def LSSA_moveMotors(angles_BSEWG):
 
-    # If the servos detect a current of 600mA(gripper)/1A(base, shoulder, elbow and wrist) or higher before reaching the requested positions they will halt and hold
+    # If the servos detect a current >= 600mA(gripper)/1A(other servos) before reaching the requested positions they will halt and hold
     wrist.moveCH(angles_BSEWG[3], 1000)
     shoulder.moveCH(angles_BSEWG[1], 1000)
     elbow.moveCH(angles_BSEWG[2], 1000)
@@ -109,47 +109,47 @@ def LSSA_moveMotors(angles_BSEWG):
 
     # Check if they reached the requested position
     while arrived == False and issue == False:
-        wPos = wrist.getPosition()
-        sPos = shoulder.getPosition()
-        ePos = elbow.getPosition()
-        bPos = base.getPosition()
-        # If any position is None
-        if (wPos is None or sPos is None or ePos is None or bPos is None):
-            print("- Unknown position")
+        bStat = base.getStatus()
+        sStat = shoulder.getStatus()
+        eStat = elbow.getStatus()
+        wStat = wrist.getStatus()
+        gStat = gripper.getStatus()
+        # If a status is None print message
+        if (bStat is None or sStat is None or eStat is None or wStat is None or gStat is None):
+            print("- Unknown status")
             arrived = False
-        # If it hasn't reached the requested position return arrived = False
-        elif ((int(wPos)-angles_BSEWG[3])>20 or (int(sPos)-angles_BSEWG[1])>20 or (int(ePos)-angles_BSEWG[2])>20 or (int(bPos)-angles_BSEWG[0])>20):
-            arrived = False
-            wStat = wrist.getStatus()
-            sStat = shoulder.getStatus()
-            eStat = elbow.getStatus()
-            bStat = base.getStatus()
-            gStat = gripper.getStatus()
-            print("- Hasn't arrived yet")
-            # If a status is None print message
-            if (wStat is None or sStat is None or eStat is None or bStat is None or gStat is None):
-                print("- Unknown status")
-                arrived = False
-            # If the statuses aren't None check their values
-            else:
-                # If a servo is Outside limits, Stuck, Blocked or in Safe Mode before it reaches the requested position return issue = True
-                if (wStat>'6' or sStat>'6' or eStat>'6' or bStat>'6' or gStat>'6'):
-                    issue = True
-                    print("- Issue detected")
-                    allMotors.reset
-                    allMotors.setColorLED(lssc.LSS_LED_Red)
-                    time.sleep(2)
-                # If all the servos are holding positions check if they have arrived
-                elif (wStat=='6' and sStat=='6' and eStat=='6' and bStat=='6' and gStat=='6'):
-                    if ((int(wrist.getPosition())-angles_BSEWG[3])>20 or (int(shoulder.getPosition())-angles_BSEWG[1])>20 or (int(elbow.getPosition())-angles_BSEWG[2])>20 or (int(base.getPosition())-angles_BSEWG[0])>20):
-                        print("- Obstacle detected")
-                        issue = True
-                    else:
-                        print("- Holding position")
-                        arrived = True
-        # If it reached the requested position return arrived = True
+        # If the statuses aren't None check their values
         else:
-            arrived = True
+            # If a servo is Outside limits, Stuck, Blocked or in Safe Mode before it reaches the requested position reset the servos and return issue
+            if (bStat>'6'  or sStat>'6' or eStat>'6'or wStat>'6' or gStat>'6'):
+                allMotors.setColorLED(lssc.LSS_LED_Red)
+                allMotors.reset
+                time.sleep(2)
+                allMotors.confirm
+                print("- Issue detected")
+                issue = True
+            # If all the servos are holding positions check if they have arrived
+            elif (bStat=='6' and sStat=='6' and eStat=='6' and wStat=='6' and gStat=='6'):
+                bPos = base.getPosition()
+                sPos = shoulder.getPosition()
+                ePos = elbow.getPosition()
+                wPos = wrist.getPosition()
+                # If any position is None
+                if (bPos is None or sPos is None or ePos is None or wPos is None):
+                    print("- Unknown position")
+                # If they are holding in a different position than requested one return issue
+                elif (abs(int(bPos)-angles_BSEWG[0])>20 or abs(int(sPos)-angles_BSEWG[1])>20 or abs(int(ePos)-angles_BSEWG[2])>20 or abs(int(wPos)-angles_BSEWG[3])>20):
+                    # Debugging
+                    print("Base Current (mA) = " + str(base.getCurrent()))
+                    print("Shoulder Current (mA) = " + str(shoulder.getCurrent()))
+                    print("Elbow Current (mA) = " + str(elbow.getCurrent()))
+                    print("Wrist Current (mA) = " + str(wrist.getCurrent()))
+
+                    print("- Obstacle detected")
+                    issue = True
+                else:
+                    print("- Arrived\n")
+                    arrived = True
 
     return(arrived)
 
@@ -176,14 +176,15 @@ def CBtoXY(targetCBsq, params):
 
     return(x,y)
 
-def executeMove(move, params, color):
+def executeMove(move, params, color, homography, cap):
     global playerColor
+
     moveState = False
     playerColor = color
     allMotors.setColorLED(lssc.LSS_LED_Cyan)
     z = params["cbHeight"] + params["pieceHeight"]
     angles_rest = (0,-1100,450,1100,0)
-    gClose = -2
+    gClose = -1.5
     gOpen = -8
     goDown = 0.6*params["pieceHeight"]
     gripState = gOpen
@@ -194,18 +195,14 @@ def executeMove(move, params, color):
         x, y = CBtoXY((move[i],move[i+1]), params)
         angles_BSEWG1 = LSS_IK([x, y, z + 1, gripState])
         print("1) MOVE UP")
-        #print("x: " + str(x) + " y: " + str(y) + " z: " + str(z+1))
         arrived1 = LSSA_moveMotors(angles_BSEWG1)
-        print("* Arrived: " + str(arrived1) + "\n")
-        askPermision(angles_BSEWG1, arrived1)
+        askPermision(angles_BSEWG1, arrived1, homography, cap)
 
         # Go down
         angles_BSEWG2 = LSS_IK([x, y, z - 1 - goDown, gripState])
         print("2) GO DOWN")
-        #print("x: " + str(x) + " y: " + str(y) + " z: " + str(z))
         arrived2 = LSSA_moveMotors(angles_BSEWG2)
-        print("* Arrived: " + str(arrived2) + "\n")
-        askPermision(angles_BSEWG2, arrived2)
+        askPermision(angles_BSEWG2, arrived2, homography, cap)
 
         if (i/2)%2: # Uneven move (go lower to grab the piece)
             gripState = gOpen
@@ -215,7 +212,7 @@ def executeMove(move, params, color):
             goDown = 0.5*params["pieceHeight"]
 
         # Close / Open the gripper
-        gripper.moveCH(gripState*10, 600)
+        gripper.moveCH(int(gripState*10), 600)
         time.sleep(1)
         print("3) CLOSE/OPEN the gripper\n")
         
@@ -223,38 +220,36 @@ def executeMove(move, params, color):
         angles_BSEWG3 = LSS_IK([x, y, z + 1, gripState])
         print("4) GO UP")
         arrived3 = LSSA_moveMotors(angles_BSEWG3)
-        print("* Arrived: " + str(arrived3) + "\n")
-        askPermision(angles_BSEWG3, arrived3)
+        askPermision(angles_BSEWG3, arrived3, homography, cap)
 
     # Go back to resting position and go limp
     print("5) REST")
-    moveState = LSSA_moveMotors(angles_rest)
-    print("* Arrived: " + str(moveState) + "\n")
+    _ = LSSA_moveMotors(angles_rest)
+    time.sleep(2)
     allMotors.limp()
     allMotors.setColorLED(lssc.LSS_LED_Black)
 
     return(moveState)
 
-def askPermision(angles_BSEWG, arrived):
-    global homography
+def askPermision(angles_BSEWG, arrived, homography, cap):
 
     angles_rest = (0,-1100,450,1100,0)
     sec = 0
 
     while arrived == False:                                 # If the servos couldn't reach the requested position
-        allMotors.setColorLED(lssc.LSS_LED_Magenta)         # Change LEDs to Magenta
-        _ = LSSA_moveMotors(angles_rest)                    # Go to resting position
-        allMotors.limp()
         if sec == 0:
-            inter.speak("excuse")                       # Play audio asking for permission
+            inter.speak("excuse")                           # Play audio asking for permission
             pass
         else:
             pass
             inter.speak("please")
+        allMotors.setColorLED(lssc.LSS_LED_Magenta)         # Change LEDs to Magenta
+        _ = LSSA_moveMotors(angles_rest)                    # Go to resting position
+        allMotors.limp()
         sec = 0
 
         while arrived == False and sec < 5:                 # If the servos couldn't reach the requested position and we haven't waited 5 sec
-            if vm.safetoMove(homography) != 0 or sec == 4:  # We check if it is safe to move (vision code) or if we have waited 5 sec
+            if vm.safetoMove(homography, cap) != 0 or sec == 4:  # We check if it is safe to move (vision code) or if we have waited 5 sec
                 allMotors.setColorLED(lssc.LSS_LED_Cyan)    # If it is true we change LEDs back to cyan
                 arrived = LSSA_moveMotors(angles_BSEWG)     # And try moving the motors again
             else:
