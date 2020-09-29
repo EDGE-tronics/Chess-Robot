@@ -131,6 +131,9 @@ class LSS:
 	#> Actions
 	def reset(self):
 		return (genericWrite(self.servoID, lssc.LSS_ActionReset))
+
+	def confirm(self):
+		return (genericWrite(self.servoID, lssc.LSS_ActionConfirm))
 	
 	def limp(self):
 		return (genericWrite(self.servoID, lssc.LSS_ActionLimp))

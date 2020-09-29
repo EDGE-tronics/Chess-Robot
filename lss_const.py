@@ -95,6 +95,7 @@ LSS_LED_White = 7
 
 # Commands - actions
 LSS_ActionReset = "RESET"
+LSS_ActionConfirm = "CONFIRM"
 LSS_ActionLimp = "L"
 LSS_ActionHold = "H"
 LSS_ActionParameterTime = "T"
