@@ -88,11 +88,19 @@ def findMoves(img1, img2):
     
     return(coordinates)
 
-def safetoMove(H, cap):
+def safetoMove(H, cap, selectedCam):
 
-    route = os.getcwd() + '/'
-    cbPattern = cv2.imread(route+'interface_images/cb_pattern.jpg', cv2.IMREAD_GRAYSCALE)
-    _, img = cap.read()
+    cbPattern = cv2.imread(os.getcwd() + '/' +'interface_images/cb_pattern.jpg', cv2.IMREAD_GRAYSCALE)
+
+    if selectedCam:
+        for i in range(5):                    # Clear images stored in buffer
+            cap.grab()
+        _ , img = cap.read()                  # USB Cam
+    else:
+        cap.capture(rawCapture, format="bgr") # RPi Cam
+        img = rawCapture.array
+        rawCapture.truncate(0)                # Clear the stream in preparation for the next image
+
     img = cv2.warpPerspective(img, H, (cbPattern.shape[1], cbPattern.shape[0]))
 
     # Kmeans algorithm (Map the image to only two colors)
