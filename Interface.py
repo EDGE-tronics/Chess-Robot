@@ -112,6 +112,7 @@ def pcTurn(board,engine):
     global state
     global homography
     global cap
+    global selectedCam
 
     command = ""
     pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
@@ -137,7 +138,7 @@ def pcTurn(board,engine):
     if command:
         speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
-    ac.executeMove(sequence["seq"], phisicalParams, playerColor, homography, cap)
+    ac.executeMove(sequence["seq"], phisicalParams, playerColor, homography, cap, selectedCam)
     state = "robotMove"
     updateBoard(sequence, board)
 
