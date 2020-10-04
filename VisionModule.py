@@ -97,6 +97,7 @@ def safetoMove(H, cap, selectedCam):
             cap.grab()
         _ , img = cap.read()                  # USB Cam
     else:
+        rawCapture = PiRGBArray(cap, size=(640, 480))
         cap.capture(rawCapture, format="bgr") # RPi Cam
         img = rawCapture.array
         rawCapture.truncate(0)                # Clear the stream in preparation for the next image
