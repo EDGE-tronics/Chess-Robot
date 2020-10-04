@@ -118,7 +118,6 @@ def pcTurn(board,engine):
     pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
     sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
     window.FindElement(key = "gameMessage").Update(sequence["type"])
-    board.push(pcMove.move)
     if board.is_checkmate():
         window.FindElement(key = "robotMessage").Update("CHECKMATE!")
         command = "checkmate"
@@ -140,6 +139,7 @@ def pcTurn(board,engine):
         speakThread.start()
     ac.executeMove(sequence["seq"], phisicalParams, playerColor, homography, cap, selectedCam)
     state = "robotMove"
+    board.push(pcMove.move)
     updateBoard(sequence, board)
 
 def startEngine():
@@ -147,7 +147,6 @@ def startEngine():
     global state
     global homography
 
-    #print ("startEngine")
     engine = cl.chess.engine.SimpleEngine.popen_uci(chessRoute)
     engine.configure({"Skill Level": skillLevel})
     if playerColor == colorTurn:
@@ -394,6 +393,8 @@ def calibration(): # gameState: calibration
             newGameState = "ocupiedBoard"
             break
         if button == "Back":
+            if not selectedCam:
+                cap.close()
             newGameState = "config"
             break
         if button in (None, 'Exit'):        # MAIN WINDOW
@@ -438,7 +439,6 @@ def newGameWindow (): # gameState: config
                 newGameState = "calibration"
                 playerColor = value["userWhite"]
                 skillLevel = value["enginelevel"]*2
-                #print(skillLevel)
                 gameTime = float(value["timeInput"]*60)
             break
         if button in (None, 'Exit'): # MAIN WINDOW
@@ -507,8 +507,11 @@ def takePIC():
 def quitGameWindow ():
     global playing
     global window
+    global cap
     windowName = "Quit Game"
     quitGame = [[sg.Text('Are you sure?',justification='center', size=(30, 1), font='Any 13')], [sg.Submit("Yes",  size=(15, 1)),sg.Submit("No", size=(15, 1))]]
+    if not selectedCam:
+        cap.close()
     if playing:
         while True:
             windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='interface_images/robot_icon.ico').Layout(quitGame)
@@ -699,11 +702,9 @@ def main():
                 window.FindElement(key = "gameMessage").Update("Time Out\n"+ "White Wins")
 
         if state == "stby": # stby
-            #print(state)
             pass
 
         elif state == "startMenu": # Start Menu
-            #print(state)
             if newGameState == "config":
                 newGameWindow()
             elif newGameState == "calibration":
@@ -743,7 +744,6 @@ def main():
                     state = "playerTurn"
         
         elif state == "pcTurn": # PC turn
-            #print(state)
             
             if board.turn:
                 window.FindElement(key = "clockButton").Update(image_filename=wclock)
@@ -755,7 +755,6 @@ def main():
             state = "stby"         # Wait for the PC move, thread changes the state
 
         elif state == "robotMove": # Robotic arm turn
-            #(state)
             previousIMG = takePIC()
             prevIMG = vm.applyHomography(previousIMG,homography)
             prevIMG = vm.applyRotation(prevIMG,rotMat)
@@ -767,22 +766,24 @@ def main():
                 window.FindElement(key = "clockButton").Update(image_filename=bclock)
 
         elif state == "showGameResult":
-            #print(state)
             gameResult = board.result()
             if gameResult == "1-0":
                 window.FindElement(key = "gameMessage").Update("Game Over" + "\nWhite Wins")
                 if not playerColor:    # If the player color is black -> robot color is white
                     ac.winLED(ac.allMotors)
+                else:
+                    speak("goodbye")
             elif gameResult == "0-1":
                 window.FindElement(key = "gameMessage").Update("Game Over" + "\nBlack Wins")
                 if playerColor:        # If the player color is white -> robot color is black
                     ac.winLED(ac.allMotors)
+                else:
+                    speak("goodbye")
             elif gameResult == "1/2-1/2":
                 window.FindElement(key = "gameMessage").Update("Game Over" + "\nDraw")
             else:
                 window.FindElement(key = "gameMessage").Update("Game Over")
             window.FindElement(key = "robotMessage").Update("Goodbye")
-            speak("goodbye")
             quitGame()
             state = "stby"
             
