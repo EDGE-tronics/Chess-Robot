@@ -135,7 +135,6 @@ def LSSA_moveMotors(angles_BSEWG):
                 sPos = int(shoulder.getPosition())
                 ePos = int(elbow.getPosition())
                 wPos = int(wrist.getPosition())
-                
                 # If any position is None
                 if (bPos is None or sPos is None or ePos is None or wPos is None):
                     print("- Unknown position")
@@ -147,7 +146,7 @@ def LSSA_moveMotors(angles_BSEWG):
                     print("- Arrived\n")
                     arrived = True
 
-    return(arrived)
+    return(arrived, issue)
 
 def CBtoXY(targetCBsq, params, color):
 
@@ -187,14 +186,14 @@ def executeMove(move, params, color, homography, cap, selectedCam):
         x, y = CBtoXY((move[i],move[i+1]), params, color)
         angles_BSEWG1 = LSS_IK([x, y, z + 1, gripState])
         print("1) MOVE UP")
-        arrived1 = LSSA_moveMotors(angles_BSEWG1)
-        askPermision(angles_BSEWG1, arrived1, homography, cap, selectedCam)
+        arrived1,issue1 = LSSA_moveMotors(angles_BSEWG1)
+        askPermision(angles_BSEWG1, arrived1, issue1, homography, cap, selectedCam)
 
         # Go down
         angles_BSEWG2 = LSS_IK([x, y, z - 1 - goDown, gripState])
         print("2) GO DOWN")
-        arrived2 = LSSA_moveMotors(angles_BSEWG2)
-        askPermision(angles_BSEWG2, arrived2, homography, cap, selectedCam)
+        arrived2,issue2 = LSSA_moveMotors(angles_BSEWG2)
+        askPermision(angles_BSEWG2, arrived2, issue2, homography, cap, selectedCam)
 
         if (i/2)%2: # Uneven move (go lower to grab the piece)
             gripState = gOpen
@@ -211,38 +210,41 @@ def executeMove(move, params, color, homography, cap, selectedCam):
         # Go up
         angles_BSEWG3 = LSS_IK([x, y, z + 1, gripState])
         print("4) GO UP")
-        arrived3 = LSSA_moveMotors(angles_BSEWG3)
-        askPermision(angles_BSEWG3, arrived3, homography, cap, selectedCam)
+        arrived3,issue3 = LSSA_moveMotors(angles_BSEWG3)
+        askPermision(angles_BSEWG3, arrived3, issue3, homography, cap, selectedCam)
 
     # Go back to resting position and go limp
     print("5) REST")
-    moveState = LSSA_moveMotors(angles_rest)
+    moveState,_ = LSSA_moveMotors(angles_rest)
     allMotors.limp()
     allMotors.setColorLED(lssc.LSS_LED_Black)
 
     return(moveState)
 
-def askPermision(angles_BSEWG, arrived, homography, cap, selectedCam):
+def askPermision(angles_BSEWG, arrived, issue, homography, cap, selectedCam):
 
     angles_rest = (0,-1150,450,1100,0)
     sec = 0
 
     while arrived == False:                                 # If the servos couldn't reach the requested position
-        if sec == 0:
-            inter.speak("excuse")                           # Play audio asking for permission
-            pass
+        if issue == False:
+            if sec == 0:
+                inter.speak("excuse")                       # Play audio asking for permission
+                pass
+            else:
+                pass
+                inter.speak("please")
+            allMotors.setColorLED(lssc.LSS_LED_Magenta)     # Change LEDs to Magenta
+            LSSA_moveMotors(angles_rest)                    # Go to resting position
+            allMotors.limp()
+            sec = 0
         else:
-            pass
-            inter.speak("please")
-        allMotors.setColorLED(lssc.LSS_LED_Magenta)         # Change LEDs to Magenta
-        _ = LSSA_moveMotors(angles_rest)                    # Go to resting position
-        allMotors.limp()
-        sec = 0
+            inter.speak("reset")
 
         while arrived == False and sec < 5:                 # If the servos couldn't reach the requested position and we haven't waited 5 sec
             if vm.safetoMove(homography, cap, selectedCam) != 0 or sec == 4:  # Check if it is safe to move (vision code) or if we have waited 5 sec
                 allMotors.setColorLED(lssc.LSS_LED_Cyan)    # If it is true we change LEDs back to cyan
-                arrived = LSSA_moveMotors(angles_BSEWG)     # And try moving the motors again
+                arrived,issue = LSSA_moveMotors(angles_BSEWG) # And try moving the motors again
             else:
                 time.sleep(1)                               # Wait one second
             sec = sec + 1
