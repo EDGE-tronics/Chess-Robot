@@ -669,7 +669,7 @@ def main():
             ac.allMotors.setColorLED(lssc.LSS_LED_Black)
             break
 
-        if value["manubar"]=="Parameters":
+        if value["manubar"]=="Dimensions":
             if playing:
                 sg.popup("Please, first quit the game")
             else:
