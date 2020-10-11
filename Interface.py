@@ -117,6 +117,10 @@ def pcTurn(board,engine):
     command = ""
     pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
     sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
+    ac.executeMove(sequence["seq"], phisicalParams, playerColor, homography, cap, selectedCam)
+    state = "robotMove"
+    board.push(pcMove.move)
+    updateBoard(sequence, board)
     window.FindElement(key = "gameMessage").Update(sequence["type"])
     if board.is_checkmate():
         window.FindElement(key = "robotMessage").Update("CHECKMATE!")
@@ -137,10 +141,6 @@ def pcTurn(board,engine):
     if command:
         speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
-    ac.executeMove(sequence["seq"], phisicalParams, playerColor, homography, cap, selectedCam)
-    state = "robotMove"
-    board.push(pcMove.move)
-    updateBoard(sequence, board)
 
 def startEngine():
     global engine
