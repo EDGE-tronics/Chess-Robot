@@ -113,22 +113,13 @@ def pcTurn(board,engine):
     global homography
     global cap
     global selectedCam
-
+    
     command = ""
     pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
     sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
-    ac.executeMove(sequence["seq"], phisicalParams, playerColor, homography, cap, selectedCam)
-    state = "robotMove"
-    board.push(pcMove.move)
-    updateBoard(sequence, board)
+    
     window.FindElement(key = "gameMessage").Update(sequence["type"])
-    if board.is_checkmate():
-        window.FindElement(key = "robotMessage").Update("CHECKMATE!")
-        command = "checkmate"
-    elif board.is_check():
-        window.FindElement(key = "robotMessage").Update("CHECK!")
-        command = "check"
-    elif sequence["type"] == "White Queen Side Castling" or sequence["type"] == "Black Queen Side Castling":
+    if sequence["type"] == "White Queen Side Castling" or sequence["type"] == "Black Queen Side Castling":
         command = "q_castling"
     elif sequence["type"] == "White King Side Castling" or sequence["type"] == "Black King Side Castling":
         command = "k_castling"
@@ -141,6 +132,24 @@ def pcTurn(board,engine):
     if command:
         speakThread = threading.Thread(target=speak, args=[command], daemon=True)
         speakThread.start()
+        
+    command = ""
+    ac.executeMove(sequence["seq"], phisicalParams, playerColor, homography, cap, selectedCam)
+    board.push(pcMove.move)
+    updateBoard(sequence, board)
+    if board.is_checkmate():
+        window.FindElement(key = "robotMessage").Update("CHECKMATE!")
+        command = "checkmate"
+    elif board.is_check():
+        window.FindElement(key = "robotMessage").Update("CHECK!")
+        command = "check"
+    if command:
+        speakThread = threading.Thread(target=speak, args=[command], daemon=True)
+        speakThread.start()
+    state = "robotMove"
+    if board.is_game_over():
+        playing = False
+        state = "showGameResult"
 
 def startEngine():
     global engine
@@ -689,10 +698,7 @@ def main():
 
         # PC messages
         if playing:
-            if board.is_game_over():
-                playing = False
-                state = "showGameResult"
-            elif  whiteTime <= 0:
+            if  whiteTime <= 0:
                 playing = False
                 state = "showGameResult"
                 window.FindElement(key = "gameMessage").Update("Time Out\n"+"Black Wins")
@@ -738,6 +744,9 @@ def main():
                 squares = vm.findMoves(prevIMG, curIMG)
                 if playerTurn(board, squares):
                     state = "pcTurn"
+                    if board.is_game_over():
+                        playing = False
+                        state = "showGameResult"
                 else:
                     window.FindElement(key = "gameMessage").Update("Invalid move!")
                     speak("invalid_move")
