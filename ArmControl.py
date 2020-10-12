@@ -26,6 +26,7 @@ allMotors.setAngularStiffness(0)
 allMotors.setAngularHoldingStiffness(0)
 allMotors.setMaxSpeed(60)
 wrist.setMaxSpeed(120)
+gripper.setMaxSpeed(1200)
 
 CST_ANGLE_MIN = -90
 CST_ANGLE_MAX = 90
@@ -102,50 +103,57 @@ def LSSA_moveMotors(angles_BSEWG):
     shoulder.moveCH(angles_BSEWG[1], 1600)
     elbow.moveCH(angles_BSEWG[2], 1600)
     base.moveCH(angles_BSEWG[0], 1000)
-    gripper.moveCH(angles_BSEWG[4], 600)
+    gripper.moveCH(angles_BSEWG[4], 500)
 
     arrived = False
     issue = False
 
     # Check if they reached the requested position
     while arrived == False and issue == False:
-        bStat = int(base.getStatus())
-        sStat = int(shoulder.getStatus())
-        eStat = int(elbow.getStatus())
-        wStat = int(wrist.getStatus())
-        gStat = int(gripper.getStatus())
+        bStat = base.getStatus()
+        sStat = shoulder.getStatus()
+        eStat = elbow.getStatus()
+        wStat = wrist.getStatus()
+        gStat = gripper.getStatus()
+        
         # If a status is None print message
         if (bStat is None or sStat is None or eStat is None or wStat is None or gStat is None):
             print("- Unknown status")
         # If the statuses aren't None check their values
         else:
             # If a servo is Outside limits, Stuck, Blocked or in Safe Mode before it reaches the requested position reset the servos and return issue
-            if (bStat>6 or sStat>6 or eStat>6 or wStat>6 or gStat>6):
+            if (int(bStat)>6 or int(sStat)>6 or int(eStat)>6 or int(wStat)>6 or int(gStat)>6):
                 allMotors.setColorLED(lssc.LSS_LED_Red)
-                LSSA_moveMotors((0,-1150,450,1100,0))
+                wrist.moveCH(1100, 1000)
+                shoulder.moveCH(-1150, 1600)
+                elbow.moveCH(450, 1600)
+                base.moveCH(0, 1000)
                 time.sleep(2)
+                allMotors.limp()
                 allMotors.reset()
                 time.sleep(2)
                 allMotors.confirm()
+                allMotors.setMaxSpeed(60)
+                wrist.setMaxSpeed(120)
                 print("- Issue detected")
-                issue = True
+                issue = 1
             # If all the servos are holding positions check if they have arrived
-            elif (bStat==6 and sStat==6 and eStat==6 and wStat==6 and gStat==6):
-                bPos = int(base.getPosition())
-                sPos = int(shoulder.getPosition())
-                ePos = int(elbow.getPosition())
-                wPos = int(wrist.getPosition())
+            elif (int(bStat)==6 and int(sStat)==6 and int(eStat)==6 and int(wStat)==6 and int(gStat)==6):
+                bPos = base.getPosition()
+                sPos = shoulder.getPosition()
+                ePos = elbow.getPosition()
+                wPos = wrist.getPosition()
                 # If any position is None
                 if (bPos is None or sPos is None or ePos is None or wPos is None):
                     print("- Unknown position")
                 # If they are holding in a different position than requested one return issue
-                elif (abs(bPos-angles_BSEWG[0])>20 or abs(sPos-angles_BSEWG[1])>20 or abs(ePos-angles_BSEWG[2])>20 or abs(wPos-angles_BSEWG[3])>20):
+                elif (abs(int(bPos)-angles_BSEWG[0])>20 or abs(int(sPos)-angles_BSEWG[1])>20 or abs(int(ePos)-angles_BSEWG[2])>20 or abs(int(wPos)-angles_BSEWG[3])>20):
                     print("- Obstacle detected")
-                    issue = True
+                    issue = 2
                 else:
                     print("- Arrived\n")
                     arrived = True
-
+                
     return(arrived, issue)
 
 def CBtoXY(targetCBsq, params, color):
@@ -176,7 +184,7 @@ def executeMove(move, params, color, homography, cap, selectedCam):
     z = params["cbHeight"] + params["pieceHeight"]
     angles_rest = (0,-1150,450,1100,0)
     gClose = -1.5
-    gOpen = -8.5
+    gOpen = -9
     goDown = 0.6*params["pieceHeight"]
     gripState = gOpen
     
@@ -203,7 +211,7 @@ def executeMove(move, params, color, homography, cap, selectedCam):
             goDown = 0.5*params["pieceHeight"]
 
         # Close / Open the gripper
-        gripper.moveCH(int(gripState*10), 600)
+        gripper.moveCH(int(gripState*10), 500)
         time.sleep(1)
         print("3) CLOSE/OPEN the gripper\n")
         
@@ -227,24 +235,22 @@ def askPermision(angles_BSEWG, arrived, issue, homography, cap, selectedCam):
     sec = 0
 
     while arrived == False:                                 # If the servos couldn't reach the requested position
-        if issue == False:
+        if issue == 1:
+            inter.speak("reset")                            # If a servo exceeded a limit
+        else:
             if sec == 0:
                 inter.speak("excuse")                       # Play audio asking for permission
-                pass
             else:
-                pass
                 inter.speak("please")
             allMotors.setColorLED(lssc.LSS_LED_Magenta)     # Change LEDs to Magenta
             LSSA_moveMotors(angles_rest)                    # Go to resting position
             allMotors.limp()
             sec = 0
-        else:
-            inter.speak("reset")
-
-        while arrived == False and sec < 5:                 # If the servos couldn't reach the requested position and we haven't waited 5 sec
-            if vm.safetoMove(homography, cap, selectedCam) != 0 or sec == 4:  # Check if it is safe to move (vision code) or if we have waited 5 sec
+            
+        while arrived == False and sec < 3:                 # If the servos couldn't reach the requested position and we haven't waited 3 sec
+            if vm.safetoMove(homography, cap, selectedCam) != 0 or sec == 2:  # Check if it is safe to move (vision code) or if we have waited 3 sec
                 allMotors.setColorLED(lssc.LSS_LED_Cyan)    # If it is true we change LEDs back to cyan
-                arrived,issue = LSSA_moveMotors(angles_BSEWG) # And try moving the motors again
+                arrived,_ = LSSA_moveMotors(angles_BSEWG)   # And try moving the motors again
             else:
                 time.sleep(1)                               # Wait one second
             sec = sec + 1
