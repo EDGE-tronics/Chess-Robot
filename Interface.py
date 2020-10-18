@@ -672,7 +672,7 @@ def main():
         button, value = window.Read(timeout=100)
 
         if button in (None, 'Exit') or value["manubar"]=="Exit": # MAIN WINDOW
-            angles_rest = (0,-1100,450,1100,0)
+            angles_rest = (0,-1150,450,1100,0)
             _ = ac.LSSA_moveMotors(angles_rest)
             ac.allMotors.limp()
             ac.allMotors.setColorLED(lssc.LSS_LED_Black)
