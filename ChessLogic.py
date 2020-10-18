@@ -64,12 +64,12 @@ def sequenceGenerator(uciMove, board):
         if board.turn:
             squareFile = chess.square_file(chess.SQUARE_NAMES.index(first)) 
             squareRank = chess.square_rank(chess.SQUARE_NAMES.index(first))
-            result["seq"] = chess.SQUARE_NAMES[chess.square(squareFile+1,squareRank)] + graveyard + first + second
+            result["seq"] = chess.SQUARE_NAMES[chess.square(squareFile-1,squareRank)] + graveyard + first + second
             result["type"] = "Passant"
         else:
             squareFile = chess.square_file(chess.SQUARE_NAMES.index(first)) 
             squareRank = chess.square_rank(chess.SQUARE_NAMES.index(first))
-            result["seq"] = chess.SQUARE_NAMES[chess.square(squareFile-1,squareRank)] + graveyard + first + second
+            result["seq"] = chess.SQUARE_NAMES[chess.square(squareFile+1,squareRank)] + graveyard + first + second
             result["type"] = "Passant"
     elif board.is_capture(move): # Capture move
         result["seq"] = second + graveyard + first + second
