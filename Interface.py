@@ -91,7 +91,7 @@ selectedCam = 0
 skillLevel = 10     # Chess engine difficulty level
 cap = cv2.VideoCapture()
 rotMat = vm.np.zeros((2,2))
-phisicalParams = {"baseradius": 0.00,
+physicalParams = {"baseradius": 0.00,
                     "cbFrame": 0.00,
                     "sqSize": 0.00,
                     "cbHeight": 0.00,
@@ -134,7 +134,7 @@ def pcTurn(board,engine):
         speakThread.start()
         
     command = ""
-    ac.executeMove(sequence["seq"], phisicalParams, playerColor, homography, cap, selectedCam)
+    ac.executeMove(sequence["seq"], physicalParams, playerColor, homography, cap, selectedCam)
     board.push(pcMove.move)
     updateBoard(sequence, board)
     if board.is_checkmate():
@@ -595,26 +595,26 @@ def initCam(selectedCam):
     return cap
 
 def loadParams():
-    global phisicalParams
+    global physicalParams
 
     if os.path.isfile('params.txt'):
         json_file = open('params.txt')
-        phisicalParams = json.load(json_file)
+        physicalParams = json.load(json_file)
         print(json_file)
     else:
         outfile = open('params.txt', 'w')
-        json.dump(phisicalParams, outfile)
+        json.dump(physicalParams, outfile)
 
 def phisicalConfig ():
-    global phisicalParams
+    global physicalParams
     
-    windowName = "Robot parameters"
-    robotParamLayout= [[sg.Text('Insert the phisical dimentions in inches',justification='center', font='Any 14', pad=(10,10))], 
-                       [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=phisicalParams["baseradius"], font='Any 11'),sg.Text('Base Radius', pad=(0,0))],
-                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=phisicalParams["cbFrame"], font='Any 11'),sg.Text('Chess Board Frame', pad=(0,0))],
-                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=phisicalParams["sqSize"], font='Any 11'),sg.Text('Square Size', pad=(0,0))],
-                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=phisicalParams["cbHeight"], font='Any 11'),sg.Text('Chess Board Height', pad=(0,0))],
-                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=phisicalParams["pieceHeight"], font='Any 11'),sg.Text('Tallest Piece Height', pad=(0,0))],
+    windowName = "Chessboard parameters"
+    robotParamLayout= [[sg.Text('Insert the physical dimensions in inches',justification='center', font='Any 14', pad=(10,10))], 
+                       [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=physicalParams["baseradius"], font='Any 11'),sg.Text('Base Radius', pad=(0,0))],
+                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=physicalParams["cbFrame"], font='Any 11'),sg.Text('Chess Board Frame', pad=(0,0))],
+                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=physicalParams["sqSize"], font='Any 11'),sg.Text('Square Size', pad=(0,0))],
+                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=physicalParams["cbHeight"], font='Any 11'),sg.Text('Chess Board Height', pad=(0,0))],
+                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=physicalParams["pieceHeight"], font='Any 11'),sg.Text('Tallest Piece Height', pad=(0,0))],
                         [sg.Text('_'*37)],
                         [sg.Submit("Save",  size=(15, 1)),sg.Submit("Close", size=(15, 1))]]
 
@@ -622,13 +622,13 @@ def phisicalConfig ():
         robotParamWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='interface_images/robot_icon.ico').Layout(robotParamLayout)
         button,value = robotParamWindow.Read()
         if button == "Save":
-            phisicalParams = {"baseradius": value[0],
+            physicalParams = {"baseradius": value[0],
                     "cbFrame":value[1],
                     "sqSize": value[2],
                     "cbHeight":value[3],
                     "pieceHeight": value[4]}
             outfile = open('params.txt', 'w')
-            json.dump(phisicalParams, outfile)
+            json.dump(physicalParams, outfile)
             break
         if button in (None, 'Close'): # MAIN WINDOW
             break   
@@ -651,7 +651,7 @@ def main():
     global sequence
     global newGameState
     global detected
-    global phisicalParams
+    global physicalParams
     global moveState
     global prevIMG
     global rotMat
@@ -685,7 +685,7 @@ def main():
                 phisicalConfig()
 
         if button =="newGame":
-            if phisicalParams["baseradius"] and phisicalParams["cbFrame"] and phisicalParams["sqSize"] and phisicalParams["cbHeight"] and phisicalParams["pieceHeight"]: 
+            if physicalParams["baseradius"] and physicalParams["cbFrame"] and physicalParams["sqSize"] and physicalParams["cbHeight"] and physicalParams["pieceHeight"]: 
                 state = "startMenu"
             else:
                 sg.popup_error('Please configure the chess board dimensions in the Configuration option of menu bar')
