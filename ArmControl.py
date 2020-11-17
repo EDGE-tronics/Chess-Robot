@@ -120,7 +120,7 @@ def LSSA_moveMotors(angles_BSEWG):
         if (bStat is None or sStat is None or eStat is None or wStat is None or gStat is None):
             print("- Unknown status")
             i = i + 1
-            if (i >= 10):
+            if (i >= 5):
                 print("- Issue detected")
                 issue = 1
         # If the statuses aren't None check their values
@@ -140,12 +140,17 @@ def LSSA_moveMotors(angles_BSEWG):
                     print("- Unknown position")
                 # If they are holding in a different position than the requested one return issue 2
                 elif (abs(int(bPos)-angles_BSEWG[0])>20 or abs(int(sPos)-angles_BSEWG[1])>50 or abs(int(ePos)-angles_BSEWG[2])>50 or abs(int(wPos)-angles_BSEWG[3])>20):
-                    sPos = shoulder.getPosition()
-                    ePos = elbow.getPosition()
-                    # Re-check shoulder and elbow positions
-                    if (abs(int(sPos)-angles_BSEWG[1])>30 or abs(int(ePos)-angles_BSEWG[2])>30):
-                        print("- Obstacle detected")
-                        issue = 2
+                    sStat = shoulder.getStatus()
+                    eStat = elbow.getStatus()
+                    # Re-check shoulder and elbow status and positions
+                    if (int(sStat)==6 and int(eStat)==6):
+                        sPos = shoulder.getPosition()
+                        ePos = elbow.getPosition()
+                        if (sPos is None or ePos is None):
+                            print("- Unknown position")
+                        elif (abs(int(sPos)-angles_BSEWG[1])>40 or abs(int(ePos)-angles_BSEWG[2])>40):
+                                print("- Obstacle detected")
+                                issue = 2
                 else:
                     print("- Arrived\n")
                     arrived = True
@@ -179,8 +184,8 @@ def executeMove(move, params, color, homography, cap, selectedCam):
     allMotors.setColorLED(lssc.LSS_LED_Cyan)
     z = params["cbHeight"] + params["pieceHeight"]
     angles_rest = (0,-1155,450,1050,0)
-    gClose = -1.5
-    gOpen = -9
+    gClose = -2
+    gOpen = -9.5
     goDown = 0.6*params["pieceHeight"]
     gripState = gOpen
     x, y = 0, 0
@@ -259,6 +264,8 @@ def askPermision(angles_BSEWG, arrived, issue, homography, cap, selectedCam):
             allMotors.confirm()
             allMotors.setMaxSpeed(100)                      # Reconfigure parameters
             base.setMaxSpeed(60)
+            shoulder.setFilterPositionCount(15)
+            elbow.setFilterPositionCount(15)
         elif issue == 2:
             if sec == 0:
                 inter.speak("excuse")                       # Play audio asking for permission
