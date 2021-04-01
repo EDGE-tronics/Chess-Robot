@@ -352,5 +352,8 @@ class LSS:
 	
 	def setBlinkingLED(self, state):
 		return (genericWrite(self.servoID, lssc.LSS_ConfigBlinkingLED, state))
+
+	def setFilterPositionCount(self, value):
+		return (genericWrite(self.servoID, lssc.LSS_FilterPositionCount, value))
 	
 ### EOF ######################################################################

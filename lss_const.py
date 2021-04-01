@@ -123,6 +123,7 @@ LSS_ActionAngularHoldingStiffness = "AH"
 LSS_ActionAngularAcceleration = "AA"
 LSS_ActionAngularDeceleration = "AD"
 LSS_ActionEnableMotionControl = "EM"
+LSS_FilterPositionCount = "FPC"
 
 # Commands - queries
 LSS_QueryStatus = "Q"
