@@ -264,6 +264,8 @@ def askPermision(angles_BSEWG, arrived, issue, homography, cap, selectedCam):
             allMotors.confirm()
             allMotors.setMaxSpeed(100)                      # Reconfigure parameters
             base.setMaxSpeed(60)
+            shoulder.setMotionControlEnabled(0)
+            elbow.setMotionControlEnabled(0)
             shoulder.setFilterPositionCount(15)
             elbow.setFilterPositionCount(15)
         elif issue == 2:
