@@ -1,7 +1,7 @@
 altgraph==0.17
 future==0.18.2
 pefile==2019.4.18
-numpy==1.18.2
+numpy==1.21.0
 opencv-python==4.2.0.32
 PyInstaller==3.6
 pyserial==3.4
