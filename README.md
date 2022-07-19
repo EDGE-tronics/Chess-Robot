@@ -93,10 +93,7 @@ python Interface.py
 <p align="center">
   <img src="https://github.com/Robotics-Technology/Chess-Robot/blob/master/interface_images/game_start.png" width="600px"/>
 </p>
-<p align="center">
-  <img src="https://github.com/Robotics-Technology/Chess-Robot/blob/master/interface_images/lss_arm_setup.jpg" width="600px"/>
-</p>
-[![Watch the video](https://img.youtube.com/vi/Zy_o8n1uDR8/maxresdefault.jpg)](https://youtu.be/Zy_o8n1uDR8)
+[![Watch the video](https://github.com/Robotics-Technology/Chess-Robot/blob/master/interface_images/lss_arm_setup.jpg)](https://youtu.be/Zy_o8n1uDR8)
 
 ## Authors
 
