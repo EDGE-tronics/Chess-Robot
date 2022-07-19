@@ -96,7 +96,8 @@ python Interface.py
 <p align="center">
   <img src="https://github.com/Robotics-Technology/Chess-Robot/blob/master/interface_images/lss_arm_setup.jpg" width="600px"/>
 </p>
-<iframe width="560" height="315" src="https://www.youtube.com/embed/Zy_o8n1uDR8" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+https://www.youtube.com/watch?v=Zy_o8n1uDR8
+https://youtu.be/Zy_o8n1uDR8
 
 ## Authors
 
