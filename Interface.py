@@ -622,11 +622,11 @@ def phisicalConfig ():
         robotParamWindow = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='interface_images/robot_icon.ico').Layout(robotParamLayout)
         button,value = robotParamWindow.Read()
         if button == "Save":
-            physicalParams = {"baseradius": value[0],
-                    "cbFrame":value[1],
-                    "sqSize": value[2],
-                    "cbHeight":value[3],
-                    "pieceHeight": value[4]}
+            physicalParams = {"baseradius": float(value[0]),
+                    "cbFrame": float(value[1]),
+                    "sqSize": float(value[2]),
+                    "cbHeight": float(value[3]),
+                    "pieceHeight": float(value[4])}
             outfile = open('params.txt', 'w')
             json.dump(physicalParams, outfile)
             break
