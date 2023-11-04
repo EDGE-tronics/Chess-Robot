@@ -242,6 +242,14 @@ def executeMove(move, params, color, homography, cap, selectedCam):
     allMotors.limp()
     allMotors.setColorLED(lssc.LSS_LED_Black)
 
+<<<<<<< Updated upstream
+=======
+    mrm.gohome()       
+    moveState =1
+  
+
+    time.sleep(4)
+>>>>>>> Stashed changes
     return(moveState)
 
 def askPermision(angles_BSEWG, arrived, issue, homography, cap, selectedCam):
