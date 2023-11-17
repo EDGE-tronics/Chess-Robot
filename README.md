@@ -65,14 +65,8 @@ pip install -r requirements.txt
 
 ```
 pip3 install -r requirements.txt
-```
-
-If you are using the Raspberry Camera Module
-
-```
 pip3 install "picamera[array]"
 ```
-Note: To avoid incompatibilities use the versions established in the "requirements", for this it is recommended to use a virtual environment.
 
 If you have issues with OpenCV on the Raspberry Pi try the following commands:
 

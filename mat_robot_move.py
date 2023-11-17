@@ -15,7 +15,7 @@ axistorow8 = 110  # mm
 servoonleft = True
 squaresize = 32 # mm
 gripperfloatheight = 75
-grippergrabheight = -10 
+grippergrabheight = -20 
 gripperoffset = 26
 openamount = 37 #degrees
 closeamount = 2 #degrees
@@ -183,7 +183,7 @@ def pickuppiece(xmm, ymm, piecetype):
     movearmcoord (xmm, ymm, gripperfloatheight)  # go down half way
 
     waiter(1)
-    print (grippergrabheight)
+    print ("grippergrabheight:",grippergrabheight)
     movearmcoord (xmm, ymm, grippergrabheight) # go down
     closegripper(closeamount, piecetype)
     #waiter(1)

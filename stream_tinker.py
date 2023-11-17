@@ -6,6 +6,10 @@ import numpy as np
 import cv2
 import imutils
 
+HOST = '192.168.233.1'
+PORT = 80
+
+
 def frame_config_decode(frame_config):
     '''
         @frame_config bytes
@@ -60,12 +64,12 @@ def frame_payload_decode(frame_data: bytes, with_config: tuple):
     return (deepth_img, ir_img, status_img, rgb_img)
 
 
-HOST = '192.168.233.1'
-PORT = 80
 
 
 def post_encode_config(config=frame_config_encode(), host=HOST, port=PORT):
     r = requests.post('http://{}:{}/set_cfg'.format(host, port), config)
+
+    
     if(r.status_code == requests.codes.ok):
         return True
     return False
@@ -139,12 +143,14 @@ def load_frame_IR (frame_data: bytes):
 #     rgb = np.frombuffer(frame_bytes[3], 'uint8').reshape(
 #         (480, 640, 3)) if frame_bytes[3] else None
     
-    normalizedIR = np.zeros((800, 800))
-    normalizedIR = cv2.normalize(ir,  normalizedIR, 100,1000 , cv2.NORM_MINMAX)
+    
+#    normalizedIR = np.zeros((800, 800))
+#    normalizedIR = cv2.normalize(ir,  normalizedIR, 100,400 , cv2.NORM_MINMAX)
+    normalizedIR = ir
     
     
     return normalizedIR
-    #ax1 = fig.add_subplot(221)
+#ax1 = fig.add_subplot(221)
 #    if not depth is None:
         # center_dis = depth[240//2, 320//2]
         # if 0 == config[1]:

@@ -14,6 +14,10 @@ import ArmControl as ac
 import lss_const as lssc
 import pygame
 import pathlib
+import stream_tinker as depthCam
+import winsound
+import requests
+import numpy as np
 
 try:
     from picamera.array import PiRGBArray
@@ -90,7 +94,7 @@ prevIMG = []
 chessRoute = ""
 detected = True
 selectedCam = 0
-skillLevel = 10     # Chess engine difficulty level
+skillLevel = 0     # Chess engine difficulty level
 cap = cv2.VideoCapture()
 rotMat = vm.np.zeros((2,2))
 physicalParams = {"baseradius": 0.00,
@@ -118,6 +122,7 @@ def pcTurn(board,engine):
     
     command = ""
     pcMove = engine.play(board, cl.chess.engine.Limit(time=1))
+    print('pcMove',pcMove)
     sequence = cl.sequenceGenerator(pcMove.move.uci(), board)
     
     window.find_element(key = "gameMessage").Update(sequence["type"])
@@ -136,6 +141,8 @@ def pcTurn(board,engine):
         speakThread.start()
         
     command = ""
+    print('sequence["seq"]',sequence["seq"])
+    #MJ - Comment out robot move below and add our own?
     ac.executeMove(sequence["seq"], physicalParams, playerColor, homography, cap, selectedCam)
     board.push(pcMove.move)
     updateBoard(sequence, board)
@@ -330,8 +337,8 @@ def sideConfig(): # gameState: sideConfig
         if button in (None, 'Exit'): # MAIN WINDOW
             state = "stby"
             newGameState = "config"
-            break   
-
+            break
+        
     newGameWindow.close()
 
 def ocupiedBoard(): # gameState: ocupiedBoard
@@ -352,7 +359,8 @@ def ocupiedBoard(): # gameState: ocupiedBoard
         button,value = newGameWindow.Read(timeout = 10)
 
         if detected:    
-            frame = takePIC()
+            depthCam.post_encode_config(depthCam.frame_config_encode(1, 1, 255, 1, 2, 7, 1, 0, 0))
+            frame = takePIC_RGB()
             prevIMG = vm.applyHomography(frame,homography)
             imgbytes = cv2.imencode('.png', prevIMG)[1].tobytes()
             newGameWindow.find_element('boardVideo').Update(data=imgbytes)
@@ -390,19 +398,16 @@ def calibration(): # gameState: calibration
         button,value = newGameWindow.Read(timeout = 10)
 
         if detected:    
-            frame = takePIC()
+            depthCam.post_encode_config(depthCam.frame_config_encode(1, 1, 255, 1, 2, 7, 1, 0, 0))
+            frame = takePIC_RGB()
             imgbytes = cv2.imencode('.png', frame)[1].tobytes()  
             newGameWindow.find_element('boardVideo').Update(data=imgbytes)
             homography = []
             retIMG, homography = vm.findTransformation(frame,cbPattern)
             if retIMG:
-<<<<<<< Updated upstream
-                newGameWindow.FindElement('calibrationBoard').Update("Camera calibration successful. Please press Next")
-=======
                 newGameWindow.find_element('calibrationBoard').Update("Camera calibration successful. Please press Next")
                 newGameState = "ocupiedBoard"
                 break
->>>>>>> Stashed changes
             else:
                 newGameWindow.find_element('calibrationBoard').Update("Please adjust your camera and remove any chess piece")
 
@@ -430,38 +435,45 @@ def newGameWindow (): # gameState: config
     global cap
     global selectedCam
     global skillLevel
+    
+    cap = initCam(selectedCam)
+    newGameState = "calibration"
+    playerColor = True
+#                 skillLevel = value["enginelevel"]*2
+    gameTime = float(1000000)
 
-    windowName = "Configuration"
-    frame_layout = [[sg.Radio('RPi Cam', group_id='grp', default = True, key = "rpicam"), sg.VerticalSeparator(pad=None), sg.Radio('USB0', group_id='grp', key = "usb0"), sg.Radio('USB1', group_id='grp', key = "usb1")]]
 
-    initGame = [[sg.Text('Game Parameters', justification='center', pad = (25,(5,15)), font='Any 15')],
-                [sg.CBox('Play as White', key='userWhite', default = playerColor)],
-                [sg.Spin([sz for sz in range(1, 300)], initial_value=10, font='Any 11',key='timeInput'),sg.Text('Game time (min)', pad=(0,0))],
-                [sg.Combo([sz for sz in range(1, 11)], default_value=10, key="enginelevel"),sg.Text('Engine skill level', pad=(0,0))],
-                [sg.Frame('Camera Selection', frame_layout, pad=(0, 10), title_color='white')],
-                [sg.Text('_'*30)],
-                [sg.Button("Exit"), sg.Submit("Next")]]
-    windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='interface_images/robot_icon.ico').Layout(initGame)
-    while True:
-        button,value = windowNewGame.Read()
-        if button == "Next":
-            if value["rpicam"] == True:
-                selectedCam = 0
-            elif value["usb0"] == True:
-                selectedCam = 1
-            elif value["usb1"] == True:
-                selectedCam = 2
-            cap = initCam(selectedCam)
-            if detected:
-                newGameState = "calibration"
-                playerColor = value["userWhite"]
-                skillLevel = value["enginelevel"]*2
-                gameTime = float(value["timeInput"]*60)
-            break
-        if button in (None, 'Exit'): # MAIN WINDOW
-            state = "stby"
-            break   
-    windowNewGame.close() 
+#     windowName = "Configuration"
+#     frame_layout = [[sg.Radio('RPi Cam', group_id='grp', key = "rpicam"), sg.VerticalSeparator(pad=None), sg.Radio('USB0', group_id='grp', default = True, key = "usb0"), sg.Radio('USB1', group_id='grp', key = "usb1")]]
+# 
+#     initGame = [[sg.Text('Game Parameters', justification='center', pad = (25,(5,15)), font='Any 15')],
+#                 [sg.CBox('Play as White', key='userWhite', default = playerColor)],
+#                 [sg.Spin([sz for sz in range(1, 300)], initial_value=10, font='Any 11',key='timeInput'),sg.Text('Game time (min)', pad=(0,0))],
+#                 [sg.Combo([sz for sz in range(1, 11)], default_value=10, key="enginelevel"),sg.Text('Engine skill level', pad=(0,0))],
+#                 [sg.Frame('Camera Selection', frame_layout, pad=(0, 10), title_color='white')],
+#                 [sg.Text('_'*30)],
+#                 [sg.Button("Exit"), sg.Submit("Next")]]
+#     windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='interface_images/robot_icon.ico').Layout(initGame)
+#     while True:
+#         button,value = windowNewGame.Read()
+#         if button == "Next":
+#             if value["rpicam"] == True:
+#                 selectedCam = 0
+#             elif value["usb0"] == True:
+#                 selectedCam = 1
+#             elif value["usb1"] == True:
+#                 selectedCam = 2
+#             cap = initCam(selectedCam)
+#             if detected:
+#                 newGameState = "calibration"
+#                 playerColor = value["userWhite"]
+#                 skillLevel = value["enginelevel"]*2
+#                 gameTime = float(value["timeInput"]*60)
+#             break
+#         if button in (None, 'Exit'): # MAIN WINDOW
+#             state = "stby"
+#             break   
+#     windowNewGame.close() 
 
 def coronationWindow (): # gameState: config
     global playerColor
@@ -507,30 +519,57 @@ def coronationWindow (): # gameState: config
     windowNewGame.close() 
     return pieceSelected
 
-def takePIC():  
-    global selectedCam
-    global cap
-<<<<<<< Updated upstream
-    if selectedCam:
-        for i in range(5):                    # Clear images stored in buffer
-            cap.grab()
-        _ , frame = cap.read()                # USB Cam
-    else:
-        cap.capture(rawCapture, format="bgr") # RPi Cam
-        frame = rawCapture.array
-        rawCapture.truncate(0)                # Clear the stream in preparation for the next image
-=======
-    
-    requests.delete("http://192.168.233.1")
-    time.sleep(2)
+def initCam(selectedCam):
+    global detected
+    global rawCapture
+
     depthCam.post_encode_config(depthCam.frame_config_encode(1, 1, 255, 1, 2, 7, 1, 0, 0))
 
-    for i in range(5):                    # Clear images stored in buffer
+    button, value = window.Read(timeout=10)
+    p = depthCam.get_frame_from_http()      
+    cap = depthCam.load_frame_RGB(p)
+    return cap
 
+def acquire_image():
+    depthCam.post_encode_config(depthCam.frame_config_encode(1, 1, 255, 1, 2, 7, 1, 0, 0))
+    frame_IR = takePIC_IR()
+    frame_RGB= takePIC_RGB()    
+
+    frame_IR = vm.applyHomography(frame_IR,homography)
+    frame_RGB= vm.applyHomography(frame_RGB,homography)
+    
+    frame_IR = vm.applyRotation(frame_IR,rotMat)
+    frame_RGB= vm.applyRotation(frame_RGB,rotMat)
+    
+    normalized_mask = np.zeros((800, 800))
+
+    normalizedIR = cv2.normalize(frame_IR,  normalized_mask, 100,400 , cv2.NORM_MINMAX)
+    histIR = cv2.equalizeHist(normalizedIR)
+
+    #normalizedRGB = cv2.normalize(RGBIMG,  normalized_mask, 100,300 , cv2.NORM_MINMAX)
+    histRGB = cv2.cvtColor(frame_RGB, cv2.COLOR_BGR2GRAY)
+    histRGB = cv2.equalizeHist(histRGB)
+    
+    alpha = 0.5
+    beta = (1.0 - alpha)
+    combinned = cv2.addWeighted(histIR, alpha, histRGB, beta, 0.0)
+    
+    return combinned
+
+def takePIC_RGB():  
+    global selectedCam
+    global cap
+    
+    #requests.delete("http://192.168.233.1")
+    #time.sleep(2)
+    #depthCam.post_encode_config(depthCam.frame_config_encode(1, 1, 255, 1, 2, 7, 1, 0, 0))
+
+    for i in range(8):                    # Clear images stored in buffer / Allow robot arm to clear field of view
+        time.sleep(.02)
         p = depthCam.get_frame_from_http()
         frame = depthCam.load_frame_RGB(p)
     
-    freq = 500
+    freq = 900
     dur = 100
     winsound.Beep(freq,dur)
     
@@ -540,18 +579,18 @@ def takePIC_IR():
     global selectedCam
     global cap
     
-    requests.delete("http://192.168.233.1")
-    time.sleep(3)
-    depthCam.post_encode_config(depthCam.frame_config_encode(1, 1, 255, 1, 2, 7, 1, 0, 0))
+    #requests.delete("http://192.168.233.1")
+    #time.sleep(3)
+    #depthCam.post_encode_config(depthCam.frame_config_encode(1, 1, 255, 1, 2, 7, 1, 0, 0))
 
-    for i in range(5):                    # Clear images stored in buffer      
+    for i in range(8):                   # Clear images stored in buffer / Allow robot arm to clear field of view     
+        time.sleep(.02)
         p = depthCam.get_frame_from_http()
         frame = depthCam.load_frame_IR(p)
     
-    freq = 3500
-    dur = 200
-    winsound.Beep(freq,dur)
->>>>>>> Stashed changes
+    #freq = 700
+    #dur = 100
+    #winsound.Beep(freq,dur)
     
     return frame
 
@@ -561,8 +600,8 @@ def quitGameWindow ():
     global cap
     windowName = "Quit Game"
     quitGame = [[sg.Text('Are you sure?',justification='center', size=(30, 1), font='Any 13')], [sg.Submit("Yes",  size=(15, 1)),sg.Submit("No", size=(15, 1))]]
-    if not selectedCam:
-        cap.close()
+#    if not selectedCam:
+#        cap.close()
     if playing:
         while True:
             windowNewGame = sg.Window(windowName, default_button_element_size=(12,1), auto_size_buttons=False, icon='interface_images/robot_icon.ico').Layout(quitGame)
@@ -613,28 +652,7 @@ def mainBoardLayout():
                 [sg.Column(board_layout),sg.VerticalSeparator(pad=None),sg.Column(board_controls)]]
 
     return layout
-
-def initCam(selectedCam):
-    global detected
-    global rawCapture
-
-    button, value = window.Read(timeout=10)
-    if selectedCam: # USB Cam
-        cap = cv2.VideoCapture(selectedCam - 1)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH,640)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT,480)
-        if not cap.isOpened():
-            detected = False  
-            sg.popup_error('USB Video device not found')
-    else:           # RPi Cam
-        cap = PiCamera()
-        if not cap:
-            detected = False    
-            sg.popup_error('RPi camera module not found')
-        else:
-            cap.resolution = (640, 480)
-            rawCapture = PiRGBArray(cap, size=(640, 480))
-    return cap
+    
 
 def loadParams():
     global physicalParams
@@ -653,7 +671,7 @@ def phisicalConfig ():
     windowName = "Chessboard parameters"
     robotParamLayout= [[sg.Text('Insert the physical dimensions in inches',justification='center', font='Any 14', pad=(10,10))], 
                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=physicalParams["baseradius"], font='Any 11'),sg.Text('Base Radius', pad=(0,0))],
-                        [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=physicalParams["cbFrame"], font='Any 11'),sg.Text('Chess Board Frame', pad=(0,0))],
+                        [sg.Spin([sz/100 for sz in range(1, 2000)], initial_value=physicalParams["cbFrame"], font='Any 11'),sg.Text('Chess Board Frame', pad=(0,0))],
                         [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=physicalParams["sqSize"], font='Any 11'),sg.Text('Square Size', pad=(0,0))],
                         [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=physicalParams["cbHeight"], font='Any 11'),sg.Text('Chess Board Height', pad=(0,0))],
                         [sg.Spin([sz/100 for sz in range(1, 1000)], initial_value=physicalParams["pieceHeight"], font='Any 11'),sg.Text('Tallest Piece Height', pad=(0,0))],
@@ -665,10 +683,10 @@ def phisicalConfig ():
         button,value = robotParamWindow.Read()
         if button == "Save":
             physicalParams = {"baseradius": float(value[0]),
-                    "cbFrame": float(value[1]),
-                    "sqSize": float(value[2]),
-                    "cbHeight": float(value[3]),
-                    "pieceHeight": float(value[4])}
+            "cbFrame":float(value[1]),
+            "sqSize": float(value[2]),
+            "cbHeight":float(value[3]),
+            "pieceHeight": float(value[4])}
             outfile = open('params.txt', 'w')
             json.dump(physicalParams, outfile)
             break
@@ -682,16 +700,10 @@ window = sg.Window('ChessRobot', default_button_element_size=(12,1), auto_size_b
 
 def speak(command):
     pygame.mixer.init()
-<<<<<<< Updated upstream
-    filePath = str(pathlib.Path().absolute())+"/audio/"
-    pygame.mixer.music.load(filePath+command+".mp3")
-    pygame.mixer.music.play()
-=======
     # filePath = str(patdhlib.Path().absolute())+"\\"+ "audio" + "\\"
     # print("filePath:", filePath+command+".mp3")
     # pygame.mixer.music.load(filePath+command+".mp3")
     # pygame.mixer.music.play()   
->>>>>>> Stashed changes
 
 def main():
     global playerColor
@@ -718,10 +730,10 @@ def main():
     blackTime = 0
     refTime = time.time()
     board = cl.chess.Board()
-
+    
     while True :
         button, value = window.Read(timeout=100)
-        print(state)
+        #print(state)
         if button in (None, 'Exit') or value["manubar"]=="Exit": # MAIN WINDOW
             angles_rest = (0,-1150,450,1100,0)
             #_ = ac.LSSA_moveMotors(angles_rest)
@@ -770,15 +782,9 @@ def main():
                 ocupiedBoard()
             elif newGameState == "sideConfig":
                 sideConfig()
-<<<<<<< Updated upstream
-            elif newGameState == "initGame":
-=======
-                #depthCam.post_encode_config(depthCam.frame_config_encode(1, 1, 255, 1, 2, 7, 1, 0, 0))
-                previousIMG = takePIC_IR()
-                prevIMG = vm.applyHomography(previousIMG,homography)
-                prevIMG = vm.applyRotation(prevIMG,rotMat)
+                prevIMG = acquire_image()
+ 
             elif newGameState == "initGame":               
->>>>>>> Stashed changes
                 playing = True
                 newGameState = "config"
                 board = cl.chess.Board()
@@ -797,16 +803,14 @@ def main():
 
         elif state == "playerTurn": # Player Turn
             if button == "clockButton":
-<<<<<<< Updated upstream
-                currentIMG = takePIC()
-=======
                 if connectedCameraAtStartPlayer == False:
                      connectedCameraAtStartPlayer = True
-                #depthCam.post_encode_config(depthCam.frame_config_encode(1, 1, 255, 1, 2, 7, 1, 0, 0))
-                currentIMG = takePIC_IR()
->>>>>>> Stashed changes
-                curIMG = vm.applyHomography(currentIMG,homography)
-                curIMG = vm.applyRotation(curIMG,rotMat)
+                curIMG = acquire_image()
+                cv2.imshow('prevIMG', prevIMG)
+                cv2.imshow('curIMG', curIMG)                
+                cv2.waitKey(4000)
+                cv2.destroyAllWindows()
+                
                 squares = vm.findMoves(prevIMG, curIMG)
                 if playerTurn(board, squares):
                     state = "pcTurn"
@@ -831,16 +835,9 @@ def main():
             state = "stby"         # Wait for the PC move, thread changes the state
 
         elif state == "robotMove": # Robotic arm turn
-<<<<<<< Updated upstream
-            previousIMG = takePIC()
-=======
             if connectedCameraAtStartRobot == False:
               connectedCameraAtStartRobot = True
-            #depthCam.post_encode_config(depthCam.frame_config_encode(1, 1, 255, 1, 2, 7, 1, 0, 0))            
-            previousIMG = takePIC_IR()
->>>>>>> Stashed changes
-            prevIMG = vm.applyHomography(previousIMG,homography)
-            prevIMG = vm.applyRotation(prevIMG,rotMat)
+            prevIMG = acquire_image()
             state = "playerTurn"
             window.find_element(key = "robotMessage").Update("---")
             if board.turn:

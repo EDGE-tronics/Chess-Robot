@@ -13,7 +13,12 @@ except:
 def findTransformation(img,cbPattern):
 
     patternSize = (7,7)
+
+    #For rgb
     imgGray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+
+    #for ir / depth frames
+    imgGray = img
 
     # Find chessboard corners
     retCB, cornersCB = cv2.findChessboardCorners(cbPattern, patternSize, cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_FAST_CHECK + cv2.CALIB_CB_NORMALIZE_IMAGE)
@@ -61,7 +66,7 @@ def findRotation(theta):
     return(rotMAT)
 
 def findMoves(img1, img2):
-
+    #grid of 800x800, so square = 100, "size" is centre pixel
     size = 50
     img1SQ = img2SQ = []
     largest = [0, 0, 0, 0]
@@ -70,7 +75,8 @@ def findMoves(img1, img2):
         for x in range(0,8*size,size):
             img1SQ = img1[x:x+size, y:y+size]
             img2SQ = img2[x:x+size, y:y+size]
-            dist = cv2.norm(img2SQ, img1SQ)
+            dist = abs(cv2.norm(img2SQ, img1SQ))  #MJ added 'abs' to allow negative diff to be catogorized as a piece move. E.g. BLack piece on a grey square)
+            
             for z in range(0,4):
                 if dist >= largest[z]:
                     largest.insert(z,dist)
@@ -82,10 +88,14 @@ def findMoves(img1, img2):
 
     # Make threshold with a percentage of the change in color of the biggest two
     thresh = (largest[0]+largest[1])/2*(0.5)
+    print("Threshold for piece detection", thresh)
     for t in range(3,1,-1):
         if largest[t] < thresh:
             coordinates.pop()
-    
+    #MJ: Learning
+    print("\n")
+    print("###########################################################")    
+    print("Detected move coordinates ['to','from':",coordinates)
     return(coordinates)
 
 def safetoMove(H, cap, selectedCam):
