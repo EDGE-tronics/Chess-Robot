@@ -9,7 +9,7 @@ The LSS Chess Robot is a robotic arm that can play chess against you. This is a 
 ## Table of Contents
 
 - [Requirements](#requirements)
-- [Modules list](#modules-list)
+- [Modules List](#modules-list)
 - [Getting Started](#getting-started)
 - [Install](#install)
 - [Run](#run)
@@ -36,9 +36,9 @@ The LSS Chess Robot is a robotic arm that can play chess against you. This is a 
 - [OpenCV](https://opencv.org/)
 - [Stockfish](https://stockfishchess.org/)
 - [Python Chess](https://python-chess.readthedocs.io/en/latest/)
-- [PySimpleGUI](https://pysimplegui.readthedocs.io/en/latest/)
+- [FreeSimpleGUI](https://github.com/spyoungtech/FreeSimpleGUI)
 
-## Modules list
+## Modules List
 
 - [Vision Module](https://github.com/Robotics-Technology/Chess-Robot/VisionModule.py)
 - [Chess Logic](https://github.com/Robotics-Technology/Chess-Robot/ChessLogic.py)
@@ -120,7 +120,7 @@ Anyone is very welcome to contribute. Below is a list of identified improvements
 
 ## To do
 
-- Change  the gripper aperture acording to the chess piecce type
+- Change  the gripper aperture acording to the chess piece type
 - Allow re-taking pictures in the case of board obstruction
 
 ## Limitations

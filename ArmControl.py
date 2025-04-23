@@ -9,8 +9,9 @@ import lss_const as lssc
 import platform
 import Interface as inter
 
+# Change to the correct COM port for your setup
 if platform.system() == 'Windows':
-    port = "COM3"
+    port = "COM3" 
 elif platform.system() == 'Linux':
     port = "/dev/ttyUSB0"
     
