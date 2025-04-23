@@ -58,16 +58,35 @@ git clone https://github.com/Robotics-Technology/Chess-Robot.git
 
 - On Windows PC
 
+1. Create a virtual environment (recommended):
+
+```
+python -m venv env
+cd env/Scripts
+activate
+```
+
+2. Install requirements
+
 ```
 pip install -r requirements.txt
 ```
 - On Raspberry Pi
 
+1. Create a virtual environment (recommended):
+
+```
+python3 -m venv env
+source env/bin/activate
+```
+
+2. Install requirements
+
 ```
 pip3 install -r requirements.txt
 ```
 
-If you are using the Raspberry Camera Module
+3. If you are using the Raspberry Camera Module
 
 ```
 pip3 install "picamera[array]"
@@ -85,8 +104,8 @@ sudo apt-get install libhdf5-dev
 sudo apt-get install libhdf5-serial-dev
 sudo apt-get install python3-pyqt5
 sudo apt-get install stockfish
-sudo pip3 install opencv-python==3.4.6.27
-sudo pip3 install opencv-contrib-python==3.4.6.27
+sudo pip3 install opencv-python==4.5.5.64
+sudo pip3 install opencv-contrib-python
 ```
 
 ## Run
